@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Базы данных
+  postgres-auth:
+    image: postgres:14
+    container_name: postgres-auth
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: imbuy
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+
+  postgres-user:
+    image: postgres:14
+    container_name: postgres-user
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: imbuy
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_user_data:/var/lib/postgresql/data
+
+  postgres-category:
+    image: postgres:14
+    container_name: postgres-category
+    environment:
+      POSTGRES_DB: category_db
+      POSTGRES_USER: imbuy
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_category_data:/var/lib/postgresql/data
+
+  postgres-lot:
+    image: postgres:14
+    container_name: postgres-lot
+    environment:
+      POSTGRES_DB: lot_db
+      POSTGRES_USER: imbuy
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_lot_data:/var/lib/postgresql/data
+
+  postgres-bid:
+    image: postgres:14
+    container_name: postgres-bid
+    environment:
+      POSTGRES_DB: bid_db
+      POSTGRES_USER: imbuy
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_bid_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_auth_data:
+  postgres_user_data:
+  postgres_category_data:
+  postgres_lot_data:
+  postgres_bid_data:
