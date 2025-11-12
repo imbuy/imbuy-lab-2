@@ -1,9 +1,8 @@
-server:
-  port: 8083
-
 spring:
   application:
     name: auth-service
+  config:
+    import: "optional:configserver:http://localhost:8888"
 
 eureka:
   client:
@@ -11,14 +10,6 @@ eureka:
       defaultZone: http://localhost:8761/eureka
   instance:
     prefer-ip-address: true
-
-feign:
-  client:
-    config:
-      default:
-        connectTimeout: 5000
-        readTimeout: 5000
-        loggerLevel: basic
 
 logging:
   level:

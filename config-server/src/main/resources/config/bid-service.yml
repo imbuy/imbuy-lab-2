@@ -1,0 +1,15 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: bid-service
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5436/bid_db
+    username: imbuy
+    password: secret
+
+logging:
+  level:
+    imbuy.bid: DEBUG
+

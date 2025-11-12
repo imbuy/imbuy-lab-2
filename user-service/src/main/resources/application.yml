@@ -1,22 +1,8 @@
-server:
-  port: 8082
-
 spring:
   application:
     name: user-service
-  datasource:
-    url: jdbc:postgresql://localhost:5433/user_db
-    username: imbuy
-    password: secret
-    driver-class-name: org.postgresql.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        show_sql: true
-        format_sql: true
+  config:
+    import: "optional:configserver:http://localhost:8888"
 
 eureka:
   client:
