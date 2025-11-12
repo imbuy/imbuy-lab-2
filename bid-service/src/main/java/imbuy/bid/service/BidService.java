@@ -6,79 +6,90 @@ import imbuy.bid.dto.CreateBidDto;
 import imbuy.bid.dto.PageResponse;
 import imbuy.bid.repository.BidRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-// исправить это все
 public class BidService {
 
     private final BidRepository bidRepository;
 
-    public PageResponse<BidDto> getBidsByLotId(Long lotId, Pageable pageable) {
-        Page<Bid> bids = bidRepository.findByLotIdOrderByCreatedAtDesc(lotId, pageable);
-        return PageResponse.of(bids.map(this::mapToDto));
+    public Mono<PageResponse<BidDto>> getBidsByLotId(Long lotId, Pageable pageable) {
+        return bidRepository.findByLotIdOrderByCreatedAtDesc(lotId, pageable)
+                .map(this::mapToDto)
+                .collectList()
+                .flatMap(bids -> {
+                    return bidRepository.countByLotId(lotId)
+                            .map(total -> {
+                                int pageNumber = pageable.getPageNumber();
+                                int pageSize = pageable.getPageSize();
+                                boolean hasNext = (pageNumber + 1) * pageSize < total;
+                                boolean hasPrevious = pageNumber > 0;
+
+                                return new PageResponse<>(
+                                        bids,
+                                        pageNumber,
+                                        pageSize,
+                                        hasNext,
+                                        hasPrevious
+                                );
+                            });
+                });
     }
 
-    public BidDto placeBid(Long lotId, CreateBidDto createBidDto, Long currentUserId) {
-        // Временная валидация - надо вызов Lot Service
-        validateBid(lotId, createBidDto.amount(), currentUserId);
+    public Mono<BidDto> placeBid(Long lotId, CreateBidDto createBidDto, Long currentUserId) {
+        return validateBid(lotId, createBidDto.amount(), currentUserId)
+                .then(createBid(lotId, createBidDto.amount(), currentUserId))
+                .flatMap(bidRepository::save)
+                .map(this::mapToDto);
+    }
 
+    public Mono<BidDto> getWinningBid(Long lotId) {
+        return bidRepository.findFirstByLotIdOrderByAmountDesc(lotId)
+                .map(this::mapToDto)
+                .switchIfEmpty(Mono.empty());
+    }
+
+    public Mono<Integer> countBidsByLot(Long lotId) {
+        return bidRepository.countByLotId(lotId)
+                .map(Math::toIntExact);
+    }
+
+    public Mono<Bid> getHighestBidByLot(Long lotId) {
+        return bidRepository.findFirstByLotIdOrderByAmountDesc(lotId);
+    }
+
+    private Mono<Void> validateBid(Long lotId, BigDecimal amount, Long bidderId) {
+        return bidRepository.findMaxBidAmountByLotId(lotId)
+                .flatMap(maxBid -> {
+                    if (maxBid != null) {
+                        BigDecimal minBid = maxBid.add(new BigDecimal("10.00"));
+                        if (amount.compareTo(minBid) < 0) {
+                            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                    String.format("Bid must be at least %.2f", minBid)));
+                        }
+                    }
+                    return Mono.empty();
+                })
+                .switchIfEmpty(Mono.empty())
+                .then();
+    }
+
+    private Mono<Bid> createBid(Long lotId, BigDecimal amount, Long bidderId) {
         Bid bid = Bid.builder()
                 .lotId(lotId)
-                .bidderId(currentUserId)
-                .amount(createBidDto.amount())
+                .bidderId(bidderId)
+                .amount(amount)
                 .createdAt(LocalDateTime.now())
                 .build();
-
-        Bid savedBid = bidRepository.save(bid);
-        return mapToDto(savedBid);
-    }
-
-    public BidDto getWinningBid(Long lotId) {
-        return bidRepository.findTopByLotIdOrderByAmountDesc(lotId)
-                .map(this::mapToDto)
-                .orElse(null);
-    }
-
-    public int countBidsByLot(Long lotId) {
-        return Math.toIntExact(bidRepository.countByLotId(lotId));
-    }
-
-    public Optional<Bid> getHighestBidByLot(Long lotId) {
-        return bidRepository.findTopByLotIdOrderByAmountDesc(lotId);
-    }
-
-    private void validateBid(Long lotId, BigDecimal amount, Long bidderId) {
-        // Временная валидация - в реальном приложении здесь был бы вызов Lot Service
-        // для проверки статуса лота, текущей цены и т.д.
-
-        // Проверяем, есть ли уже ставки на этот лот
-        Optional<BigDecimal> maxBid = bidRepository.findMaxBidAmountByLotId(lotId);
-
-        if (maxBid.isPresent()) {
-            BigDecimal minBid = maxBid.get().add(new BigDecimal("10.00")); // временный шаг
-            if (amount.compareTo(minBid) < 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        String.format("Bid must be at least %.2f", minBid));
-            }
-        }
-
-        // Проверяем, что пользователь не делает ставку на свой же лот
-        // В реальном приложении здесь был бы вызов Lot Service для получения ownerId
-        Long lotOwnerId = 1L; // временное значение
-        if (bidderId.equals(lotOwnerId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Owner cannot place a bid on their own lot");
-        }
+        return Mono.just(bid);
     }
 
     private BidDto mapToDto(Bid bid) {
@@ -86,7 +97,7 @@ public class BidService {
                 bid.getId(),
                 bid.getAmount(),
                 bid.getBidderId(),
-                "User " + bid.getBidderId() // временное значение
+                "User " + bid.getBidderId()
         );
     }
 }
