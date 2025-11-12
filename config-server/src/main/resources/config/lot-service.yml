@@ -1,0 +1,13 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: lot-service
+  datasource:
+    url: jdbc:postgresql://localhost:5435/lot_db
+
+logging:
+  level:
+    imbuy.lot: DEBUG
+
