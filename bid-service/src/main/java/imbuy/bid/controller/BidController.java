@@ -11,8 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/bids")
@@ -24,31 +24,31 @@ public class BidController {
 
     @GetMapping("/lots/{lotId}")
     @Operation(summary = "Get bid history for a lot")
-    public ResponseEntity<PageResponse<BidDto>> getBidsByLotId(
+    public Mono<PageResponse<BidDto>> getBidsByLotId(
             @PathVariable Long lotId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
         Pageable pageable = PageRequest.of(page, Math.min(size, 50));
-        PageResponse<BidDto> bids = bidService.getBidsByLotId(lotId, pageable);
-        return ResponseEntity.ok(bids);
+        return bidService.getBidsByLotId(lotId, pageable);
     }
 
     @PostMapping("/lots/{lotId}")
+    @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Place a bid on a lot")
-    public ResponseEntity<BidDto> placeBid(
+    public Mono<BidDto> placeBid(
             @PathVariable Long lotId,
             @RequestParam Long currentUserId,
             @Valid @RequestBody CreateBidDto createBidDto) {
 
-        BidDto bid = bidService.placeBid(lotId, createBidDto, currentUserId);
-        return new ResponseEntity<>(bid, HttpStatus.CREATED);
+        return bidService.placeBid(lotId, createBidDto, currentUserId);
     }
 
     @GetMapping("/lots/{lotId}/winning")
     @Operation(summary = "Get winning bid for a lot")
-    public ResponseEntity<BidDto> getWinningBid(@PathVariable Long lotId) {
-        BidDto winningBid = bidService.getWinningBid(lotId);
-        return winningBid != null ? ResponseEntity.ok(winningBid) : ResponseEntity.notFound().build();
+    public Mono<BidDto> getWinningBid(@PathVariable Long lotId) {
+        return bidService.getWinningBid(lotId)
+                .switchIfEmpty(Mono.error(new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Winning bid not found")));
     }
 }
