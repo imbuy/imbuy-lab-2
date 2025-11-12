@@ -11,8 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/categories")
@@ -24,49 +24,45 @@ public class CategoryController {
 
     @GetMapping("/tree")
     @Operation(summary = "Get category tree")
-    public ResponseEntity<CategoryTreeDto> getCategoryTree() {
-        CategoryTreeDto tree = categoryService.getCategoryTree();
-        return ResponseEntity.ok(tree);
+    public Mono<CategoryTreeDto> getCategoryTree() {
+        return categoryService.getCategoryTree();
     }
 
     @GetMapping
     @Operation(summary = "Get all categories with pagination")
-    public ResponseEntity<PageResponse<CategoryDto>> getAllCategoriesPaginated(
+    public Mono<PageResponse<CategoryDto>> getAllCategoriesPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
         Pageable pageable = PageRequest.of(page, Math.min(size, 50));
-        PageResponse<CategoryDto> categories = categoryService.getAllCategories(pageable);
-        return ResponseEntity.ok(categories);
+        return categoryService.getAllCategories(pageable);
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get category by ID")
-    public ResponseEntity<CategoryDto> getCategoryById(@PathVariable Long id) {
-        CategoryDto category = categoryService.getCategoryById(id);
-        return ResponseEntity.ok(category);
+    public Mono<CategoryDto> getCategoryById(@PathVariable Long id) {
+        return categoryService.getCategoryById(id);
     }
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a new category")
-    public ResponseEntity<CategoryDto> createCategory(@Valid @RequestBody CategoryDto categoryDto) {
-        CategoryDto category = categoryService.createCategory(categoryDto);
-        return new ResponseEntity<>(category, HttpStatus.CREATED);
+    public Mono<CategoryDto> createCategory(@Valid @RequestBody CategoryDto categoryDto) {
+        return categoryService.createCategory(categoryDto);
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Update category")
-    public ResponseEntity<CategoryDto> updateCategory(
+    public Mono<CategoryDto> updateCategory(
             @PathVariable Long id,
             @Valid @RequestBody CategoryDto categoryDto) {
-        CategoryDto category = categoryService.updateCategory(id, categoryDto);
-        return ResponseEntity.ok(category);
+        return categoryService.updateCategory(id, categoryDto);
     }
 
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Delete category")
-    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
-        categoryService.deleteCategory(id);
-        return ResponseEntity.noContent().build();
+    public Mono<Void> deleteCategory(@PathVariable Long id) {
+        return categoryService.deleteCategory(id);
     }
 }

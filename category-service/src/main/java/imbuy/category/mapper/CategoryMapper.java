@@ -2,34 +2,30 @@ package imbuy.category.mapper;
 
 import imbuy.category.domain.Category;
 import imbuy.category.dto.CategoryDto;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.Named;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
-@Mapper(componentModel = "spring")
-public interface CategoryMapper {
+@Component
+public class CategoryMapper {
 
-    @Mapping(target = "parent_id", source = "parent.id")
-    @Mapping(target = "parent_name", source = "parent.name")
-    @Mapping(target = "children", ignore = true)
-    CategoryDto mapToDto(Category category);
+    public CategoryDto mapToDto(Category category) {
+        return new CategoryDto(
+                category.getId(),
+                category.getName(),
+                category.getParentId(),
+                null,
+                null
+        );
+    }
 
-    @Mapping(target = "parent_id", source = "parent.id")
-    @Mapping(target = "parent_name", source = "parent.name")
-    @Mapping(target = "children", source = "children", qualifiedByName = "mapChildren")
-    CategoryDto toDtoWithChildren(Category category);
-
-    @Named("mapChildren")
-    default List<CategoryDto> mapChildren(Set<Category> children) {
-        if (children == null || children.isEmpty()) {
-            return null;
-        }
-        return children.stream()
-                .map(this::toDtoWithChildren)
-                .collect(Collectors.toList());
+    public CategoryDto toDtoWithChildren(Category category, String parentName, List<CategoryDto> children) {
+        return new CategoryDto(
+                category.getId(),
+                category.getName(),
+                category.getParentId(),
+                parentName,
+                children
+        );
     }
 }
