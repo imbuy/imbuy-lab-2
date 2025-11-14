@@ -1,4 +1,4 @@
-package imbuy.auth.dto;
+package imbuy.lot.dto;
 
 public record UserDto(
         Long id,

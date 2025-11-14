@@ -1,5 +1,6 @@
 package imbuy.lot.service;
 
+import imbuy.lot.client.UserClient;
 import imbuy.lot.domain.Lot;
 import imbuy.lot.dto.*;
 import imbuy.lot.enums.LotStatus;
@@ -18,6 +19,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class LotService {
 
+    private final UserClient userClient;
     private final LotRepository lotRepository;
 
     public PageResponse<LotDto> getLots(LotFilterDto filter, Pageable pageable, Long currentUserId) {
@@ -104,7 +106,6 @@ public class LotService {
         if (lot.getStatus() != LotStatus.DRAFT && lot.getStatus() != LotStatus.PENDING_APPROVAL) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot update lot in current status");
         }
-
         if (updateLotDto.title() != null) lot.setTitle(updateLotDto.title());
         if (updateLotDto.description() != null) lot.setDescription(updateLotDto.description());
         if (updateLotDto.bid_step() != null) lot.setBidStep(updateLotDto.bid_step());
@@ -132,6 +133,9 @@ public class LotService {
     }
 
     private LotDto mapToDto(Lot lot) {
+        UserDto owner = userClient.getUserById(lot.getOwnerId());
+        String ownerName = owner != null ? owner.username() : "Unknown";
+
         return new LotDto(
                 lot.getId(),
                 lot.getTitle(),
@@ -140,13 +144,13 @@ public class LotService {
                 lot.getCurrentPrice(),
                 lot.getBidStep(),
                 lot.getOwnerId(),
-                "User " + lot.getOwnerId(), // Временное значение
+                ownerName, // username из UserService
                 lot.getCategoryId(),
                 lot.getCategoryId() != null ? "Category " + lot.getCategoryId() : null,
                 lot.getStatus(),
                 lot.getStartDate(),
                 lot.getEndDate(),
-                0, // bid_count - временно 0
+                0, // bid_count
                 null, // rejection_reason
                 lot.getWinnerId(),
                 lot.getWinnerId() != null ? "Winner " + lot.getWinnerId() : null
