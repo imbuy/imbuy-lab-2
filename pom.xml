@@ -15,7 +15,6 @@
         <module>discovery-server</module>
         <module>config-server</module>
         <module>api-gateway</module>
-        <module>auth-service</module>
         <module>user-service</module>
         <module>category-service</module>
         <module>lot-service</module>
