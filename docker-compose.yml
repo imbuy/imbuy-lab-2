@@ -13,6 +13,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_auth_data:/var/lib/postgresql/data
+    networks:
+      - imbuy-network
 
   postgres-user:
     image: postgres:14
@@ -25,6 +27,8 @@ services:
       - "5433:5432"
     volumes:
       - postgres_user_data:/var/lib/postgresql/data
+    networks:
+      - imbuy-network
 
   postgres-category:
     image: postgres:14
@@ -37,6 +41,8 @@ services:
       - "5434:5432"
     volumes:
       - postgres_category_data:/var/lib/postgresql/data
+    networks:
+      - imbuy-network
 
   postgres-lot:
     image: postgres:14
@@ -49,6 +55,8 @@ services:
       - "5435:5432"
     volumes:
       - postgres_lot_data:/var/lib/postgresql/data
+    networks:
+      - imbuy-network
 
   postgres-bid:
     image: postgres:14
@@ -61,6 +69,185 @@ services:
       - "5436:5432"
     volumes:
       - postgres_bid_data:/var/lib/postgresql/data
+    networks:
+      - imbuy-network
+
+  # Discovery Server
+  discovery-server:
+    build:
+      context: .
+      dockerfile: discovery-server/Dockerfile
+    container_name: discovery-server
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+    networks:
+      - imbuy-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Config Server
+  config-server:
+    build:
+      context: .
+      dockerfile: config-server/Dockerfile
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - SPRING_PROFILES_ACTIVE=native
+    depends_on:
+      - discovery-server
+    networks:
+      - imbuy-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8888/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # User Service
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+    container_name: user-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SERVER_PORT=8082
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-user:5432/user_db
+      - SPRING_DATASOURCE_USERNAME=imbuy
+      - SPRING_DATASOURCE_PASSWORD=secret
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+    depends_on:
+      - postgres-user
+      - discovery-server
+      - config-server
+    networks:
+      - imbuy-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Category Service
+  category-service:
+    build:
+      context: .
+      dockerfile: category-service/Dockerfile
+    container_name: category-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+      - SPRING_R2DBC_URL=r2dbc:postgresql://postgres-category:5432/category_db
+      - SPRING_R2DBC_USERNAME=imbuy
+      - SPRING_R2DBC_PASSWORD=secret
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+    depends_on:
+      - postgres-category
+      - discovery-server
+      - config-server
+    networks:
+      - imbuy-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Lot Service
+  lot-service:
+    build:
+      context: .
+      dockerfile: lot-service/Dockerfile
+    container_name: lot-service
+    ports:
+      - "8084:8084"
+    environment:
+      - SERVER_PORT=8084
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-lot:5432/lot_db
+      - SPRING_DATASOURCE_USERNAME=imbuy
+      - SPRING_DATASOURCE_PASSWORD=secret
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+    depends_on:
+      - postgres-lot
+      - discovery-server
+      - config-server
+      - user-service
+    networks:
+      - imbuy-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Bid Service
+  bid-service:
+    build:
+      context: .
+      dockerfile: bid-service/Dockerfile
+    container_name: bid-service
+    ports:
+      - "8085:8085"
+    environment:
+      - SERVER_PORT=8085
+      - SPRING_R2DBC_URL=r2dbc:postgresql://postgres-bid:5432/bid_db
+      - SPRING_R2DBC_USERNAME=imbuy
+      - SPRING_R2DBC_PASSWORD=secret
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+    depends_on:
+      - postgres-bid
+      - discovery-server
+      - config-server
+    networks:
+      - imbuy-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8085/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+    depends_on:
+      - discovery-server
+      - config-server
+      - user-service
+      - category-service
+      - lot-service
+      - bid-service
+    networks:
+      - imbuy-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  imbuy-network:
+    driver: bridge
 
 volumes:
   postgres_auth_data:
