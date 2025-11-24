@@ -3,6 +3,8 @@ spring:
     name: category-service
   config:
     import: "optional:configserver:http://localhost:8888"
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
 
 eureka:
   client:
