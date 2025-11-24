@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="001-create-categories-table" author="imbuy">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="categories"/>
+            </not>
+        </preConditions>
+        <createTable tableName="categories">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="parent_id" type="BIGINT"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-create-categories-fk" author="imbuy">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <foreignKeyConstraintExists constraintName="fk_parent_category"/>
+            </not>
+        </preConditions>
+        <addForeignKeyConstraint
+                baseTableName="categories"
+                baseColumnNames="parent_id"
+                constraintName="fk_parent_category"
+                referencedTableName="categories"
+                referencedColumnNames="id"
+                onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="001-create-categories-index" author="imbuy">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_categories_parent_id" tableName="categories"/>
+            </not>
+        </preConditions>
+        <createIndex indexName="idx_categories_parent_id" tableName="categories">
+            <column name="parent_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>
+
