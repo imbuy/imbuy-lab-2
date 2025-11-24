@@ -4,10 +4,35 @@ server:
 spring:
   application:
     name: bid-service
+  datasource:
+    url: jdbc:postgresql://localhost:5436/bid_db
+    username: imbuy
+    password: secret
   r2dbc:
     url: r2dbc:postgresql://localhost:5436/bid_db
     username: imbuy
     password: secret
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    enabled: true
+    initialize-mode: always
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    use-root-path: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
 
 logging:
   level:
