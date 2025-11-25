@@ -5,18 +5,23 @@ spring:
   application:
     name: bid-service
   datasource:
-    url: jdbc:postgresql://localhost:5436/bid_db
+    url: jdbc:postgresql://localhost:5432/bid_db
     username: imbuy
     password: secret
   r2dbc:
-    url: r2dbc:postgresql://localhost:5436/bid_db
+    url: r2dbc:postgresql://localhost:5432/bid_db
     username: imbuy
     password: secret
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.xml
     enabled: true
     initialize-mode: always
-
+eureka:
+  client:
+    service-url:
+      defaultZone: http://discovery-server:8761/eureka
+  instance:
+    prefer-ip-address: true
 springdoc:
   api-docs:
     path: /v3/api-docs

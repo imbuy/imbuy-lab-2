@@ -39,6 +39,8 @@ resilience4j:
       userServiceClient:
         baseConfig: default
         waitDurationInOpenState: 10s
+      bidServiceClient:
+        baseConfig: default
 
 springdoc:
   api-docs:
