@@ -79,8 +79,10 @@ public class LotService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Lot is not awaiting approval");
         }
 
-        lot.setStatus(LotStatus.ACTIVE);
-        Lot updatedLot = lotRepository.save(lot);
+        Lot updatedLot = lot.toBuilder()
+                .status(LotStatus.ACTIVE)
+                .build();
+        lotRepository.save(updatedLot);
 
         return mapToDto(updatedLot);
     }
@@ -93,8 +95,10 @@ public class LotService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Lot cannot be rejected");
         }
 
-        lot.setStatus(LotStatus.CANCELLED);
-        Lot updatedLot = lotRepository.save(lot);
+        Lot updatedLot = lot.toBuilder()
+                .status(LotStatus.CANCELLED)
+                .build();
+        lotRepository.save(updatedLot);
 
         return mapToDto(updatedLot);
     }
@@ -106,11 +110,12 @@ public class LotService {
         if (lot.getStatus() != LotStatus.DRAFT && lot.getStatus() != LotStatus.PENDING_APPROVAL) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot update lot in current status");
         }
-        if (updateLotDto.title() != null) lot.setTitle(updateLotDto.title());
-        if (updateLotDto.description() != null) lot.setDescription(updateLotDto.description());
-        if (updateLotDto.bid_step() != null) lot.setBidStep(updateLotDto.bid_step());
-        if (updateLotDto.end_date() != null) lot.setEndDate(updateLotDto.end_date());
-        if (updateLotDto.category_id() != null) lot.setCategoryId(updateLotDto.category_id());
+        Lot.LotBuilder lotBuilder = lot.toBuilder();
+        if (updateLotDto.title() != null) lotBuilder.title(updateLotDto.title());
+        if (updateLotDto.description() != null) lotBuilder.description(updateLotDto.description());
+        if (updateLotDto.bid_step() != null) lotBuilder.bidStep(updateLotDto.bid_step());
+        if (updateLotDto.end_date() != null) lotBuilder.endDate(updateLotDto.end_date());
+        if (updateLotDto.category_id() != null) lotBuilder.categoryId(updateLotDto.category_id());
 
         Lot updatedLot = lotRepository.save(lot);
         return mapToDto(updatedLot);
@@ -125,11 +130,6 @@ public class LotService {
         }
 
         lotRepository.delete(lot);
-    }
-
-    public void updateLotCurrentPrice(Lot lot, BigDecimal newPrice) {
-        lot.setCurrentPrice(newPrice);
-        lotRepository.save(lot);
     }
 
     private LotDto mapToDto(Lot lot) {
