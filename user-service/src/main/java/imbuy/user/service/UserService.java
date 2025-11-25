@@ -14,7 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -30,12 +30,11 @@ public class UserService {
                     if (exists) {
                         return Mono.error(new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists"));
                     }
-
-                    User user = new User();
-                    user.setEmail(request.email());
-                    user.setPassword(request.password());
-                    user.setUsername(request.username());
-                    user.setCreatedAt(LocalDateTime.now());
+                    User user = User.builder()
+                            .email(request.email())
+                            .password(request.password())
+                            .username(request.username())
+                            .build();
 
                     return Mono.fromCallable(() -> userRepository.save(user))
                             .subscribeOn(Schedulers.boundedElastic())
@@ -52,12 +51,16 @@ public class UserService {
                     }
 
                     User user = userOpt.get();
-                    user.setUsername(request.username());
+                    User.UserBuilder userBuilder = user.toBuilder()
+                            .username(request.username());
+
                     if (request.password() != null && !request.password().isEmpty()) {
-                        user.setPassword(request.password());
+                        userBuilder.password(request.password());
                     }
 
-                    return Mono.fromCallable(() -> userRepository.save(user))
+                    User updatedUser = userBuilder.build();
+
+                    return Mono.fromCallable(() -> userRepository.save(updatedUser))
                             .subscribeOn(Schedulers.boundedElastic())
                             .map(userMapper::mapToDto);
                 });
@@ -72,32 +75,22 @@ public class UserService {
     public Mono<UserDto> findById(Long id) {
         return Mono.fromCallable(() -> userRepository.findById(id))
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(userOpt -> {
-                    if (userOpt.isEmpty()) {
-                        return Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-                    }
-                    return Mono.just(userMapper.mapToDto(userOpt.get()));
-                });
+                .flatMap(userOpt -> userOpt.map(user -> Mono.just(userMapper.mapToDto(user))).orElseGet(() -> Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"))));
     }
 
     public Mono<User> getUserEntityById(Long id) {
         return Mono.fromCallable(() -> userRepository.findById(id))
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(userOpt -> {
-                    if (userOpt.isEmpty()) {
-                        return Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-                    }
-                    return Mono.just(userOpt.get());
-                });
+                .flatMap(userOpt -> userOpt.<Mono<? extends User>>map(Mono::just).orElseGet(() -> Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"))));
     }
 
     public Mono<UserDto> updateBalance(Long userId, String balance) {
         return getUserEntityById(userId)
-                .flatMap(user -> {
-                    user.setBalance(new java.math.BigDecimal(balance));
-                    return Mono.<User>fromCallable(() -> userRepository.save(user))
-                            .subscribeOn(Schedulers.boundedElastic())
-                            .map(userMapper::mapToDto);
-                });
+                .map(user -> user.toBuilder()
+                        .balance(new BigDecimal(balance))
+                        .build())
+                .flatMap(updatedUser -> Mono.fromCallable(() -> userRepository.save(updatedUser))
+                        .subscribeOn(Schedulers.boundedElastic()))
+                .map(userMapper::mapToDto);
     }
 }
