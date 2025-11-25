@@ -44,11 +44,11 @@ public class BidController {
         return bidService.placeBid(lotId, createBidDto, currentUserId);
     }
 
-    @GetMapping("/lots/{lotId}/winning")
+    @GetMapping("/lots/{lotId}/winner")
     @Operation(summary = "Get winning bid for a lot")
-    public Mono<BidDto> getWinningBid(@PathVariable Long lotId) {
-        return bidService.getWinningBid(lotId)
-                .switchIfEmpty(Mono.error(new org.springframework.web.server.ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Winning bid not found")));
+    public Long getAuctionWinner(@PathVariable Long lotId) {
+        return bidService.getAuctionWinnerId(lotId)
+                .blockOptional()
+                .orElse(null);
     }
 }

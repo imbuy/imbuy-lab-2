@@ -100,4 +100,10 @@ public class BidService {
                 "User " + bid.getBidderId()
         );
     }
+
+    public Mono<Long> getAuctionWinnerId(Long lotId) {
+        return bidRepository.findFirstByLotIdOrderByAmountDesc(lotId)
+                .map(Bid::getBidderId)
+                .switchIfEmpty(Mono.just(null));
+    }
 }
