@@ -9,6 +9,7 @@ services:
       POSTGRES_DB: auth_db
       POSTGRES_USER: imbuy
       POSTGRES_PASSWORD: secret
+      TZ: Europe/Moscow
     ports:
       - "5432:5432"
     volumes:
@@ -23,6 +24,7 @@ services:
       POSTGRES_DB: user_db
       POSTGRES_USER: imbuy
       POSTGRES_PASSWORD: secret
+      TZ: Europe/Moscow
     ports:
       - "5433:5432"
     volumes:
@@ -42,6 +44,7 @@ services:
       POSTGRES_DB: category_db
       POSTGRES_USER: imbuy
       POSTGRES_PASSWORD: secret
+      TZ: Europe/Moscow
     ports:
       - "5434:5432"
     volumes:
@@ -61,6 +64,7 @@ services:
       POSTGRES_DB: lot_db
       POSTGRES_USER: imbuy
       POSTGRES_PASSWORD: secret
+      TZ: Europe/Moscow
     ports:
       - "5435:5432"
     volumes:
@@ -80,6 +84,7 @@ services:
       POSTGRES_DB: bid_db
       POSTGRES_USER: imbuy
       POSTGRES_PASSWORD: secret
+      TZ: Europe/Moscow
     ports:
       - "5436:5432"
     volumes:
@@ -102,6 +107,7 @@ services:
       - "8761:8761"
     environment:
       - SPRING_PROFILES_ACTIVE=default
+      - TZ=Europe/Moscow
     networks:
       - imbuy-network
     healthcheck:
@@ -120,6 +126,7 @@ services:
       - "8888:8888"
     environment:
       - SPRING_PROFILES_ACTIVE=native
+      - TZ=Europe/Moscow
     depends_on:
       - discovery-server
     networks:
@@ -129,7 +136,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
   # User Service
   user-service:
     build:
@@ -145,6 +151,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=secret
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - TZ=Europe/Moscow
     depends_on:
       postgres-user:
         condition: service_healthy
@@ -178,6 +185,7 @@ services:
       - SPRING_R2DBC_PASSWORD=secret
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - TZ=Europe/Moscow
     depends_on:
       postgres-category:
         condition: service_healthy
@@ -208,6 +216,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=secret
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - TZ=Europe/Moscow
     depends_on:
       postgres-lot:
         condition: service_healthy
@@ -224,7 +233,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
   # Bid Service
   bid-service:
     build:
@@ -243,6 +251,7 @@ services:
       - SPRING_R2DBC_PASSWORD=secret
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - TZ=Europe/Moscow
     depends_on:
       postgres-bid:
         condition: service_healthy
@@ -269,6 +278,7 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - TZ=Europe/Moscow
     depends_on:
       - discovery-server
       - config-server
