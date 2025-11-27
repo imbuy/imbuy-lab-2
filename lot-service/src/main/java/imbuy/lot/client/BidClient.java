@@ -7,6 +7,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 @FeignClient(name = "bid-service", fallback = BidClientFallback.class)
 public interface BidClient {
 
-    @GetMapping("/bids/lots/{lotId}/winner")
+    @GetMapping("/bids/lots/{lotId}/winning")
     Long getAuctionWinner(@PathVariable("lotId") Long lotId);
 }
