@@ -11,9 +11,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-  liquibase:
-    change-log: classpath:db/changelog/db.changelog-master.xml
+  flyway:
     enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
 
 feign:
   client:
@@ -39,6 +40,8 @@ resilience4j:
       userServiceClient:
         baseConfig: default
         waitDurationInOpenState: 10s
+      bidServiceClient:
+        baseConfig: default
 
 springdoc:
   api-docs:
