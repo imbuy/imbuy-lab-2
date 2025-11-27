@@ -48,7 +48,6 @@ public class BidController {
     @Operation(summary = "Get winning bid for a lot")
     public Long getAuctionWinner(@PathVariable Long lotId) {
         return bidService.getAuctionWinnerId(lotId)
-                .blockOptional()
-                .orElse(null);
+                .block();
     }
 }

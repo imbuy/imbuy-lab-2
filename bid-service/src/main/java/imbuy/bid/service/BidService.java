@@ -52,7 +52,7 @@ public class BidService {
     }
 
     public Mono<BidDto> getWinningBid(Long lotId) {
-        return bidRepository.findFirstByLotIdOrderByAmountDesc(lotId)
+        return bidRepository.findHighestBidByLotId(lotId)
                 .map(this::mapToDto)
                 .switchIfEmpty(Mono.empty());
     }
@@ -63,7 +63,7 @@ public class BidService {
     }
 
     public Mono<Bid> getHighestBidByLot(Long lotId) {
-        return bidRepository.findFirstByLotIdOrderByAmountDesc(lotId);
+        return bidRepository.findHighestBidByLotId(lotId);
     }
 
     private Mono<Void> validateBid(Long lotId, BigDecimal amount, Long bidderId) {
@@ -102,8 +102,16 @@ public class BidService {
     }
 
     public Mono<Long> getAuctionWinnerId(Long lotId) {
-        return bidRepository.findFirstByLotIdOrderByAmountDesc(lotId)
+        return bidRepository.findHighestBidByLotId(lotId)
                 .map(Bid::getBidderId)
-                .switchIfEmpty(Mono.just(null));
+                .switchIfEmpty(Mono.empty())
+                .doOnNext(winnerId -> {
+                    if (winnerId != null) {
+                        System.out.println("Found winner for lot " + lotId + ": " + winnerId);
+                    } else {
+                        System.out.println("No winner found for lot " + lotId);
+                    }
+                })
+                .onErrorReturn(null);
     }
 }

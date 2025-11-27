@@ -54,7 +54,9 @@ public class LotScheduler {
     @Transactional
     public void closeLotWithWinner(Lot lot) {
         try {
+            log.info("Requesting winner for lot #{} from bid-service", lot.getId());
             Long winnerId = bidClient.getAuctionWinner(lot.getId());
+            log.info("Received winner ID for lot #{}: {}", lot.getId(), winnerId);
 
             Lot updatedLot = lot.toBuilder()
                     .status(LotStatus.COMPLETED)
@@ -66,11 +68,11 @@ public class LotScheduler {
             if (winnerId != null) {
                 log.info("Lot #{} completed. Winner: user #{}", lot.getId(), winnerId);
             } else {
-                log.info("Lot #{} completed without winner (no bids)", lot.getId());
+                log.warn("Lot #{} completed without winner (no bids or error)", lot.getId());
             }
 
         } catch (Exception e) {
-            log.error("Error closing lot #{}: {}", lot.getId(), e.getMessage());
+            log.error("Error closing lot #{}: {}", lot.getId(), e.getMessage(), e);
             Lot updatedLot = lot.toBuilder()
                     .status(LotStatus.COMPLETED)
                     .winnerId(null)
