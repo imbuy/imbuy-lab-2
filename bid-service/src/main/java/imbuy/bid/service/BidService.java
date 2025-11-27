@@ -52,7 +52,7 @@ public class BidService {
     }
 
     public Mono<BidDto> getWinningBid(Long lotId) {
-        return bidRepository.findFirstByLotIdOrderByAmountDesc(lotId)
+        return bidRepository.findHighestBidByLotId(lotId)
                 .map(this::mapToDto)
                 .switchIfEmpty(Mono.empty());
     }
@@ -63,7 +63,7 @@ public class BidService {
     }
 
     public Mono<Bid> getHighestBidByLot(Long lotId) {
-        return bidRepository.findFirstByLotIdOrderByAmountDesc(lotId);
+        return bidRepository.findHighestBidByLotId(lotId);
     }
 
     private Mono<Void> validateBid(Long lotId, BigDecimal amount, Long bidderId) {
@@ -99,5 +99,33 @@ public class BidService {
                 bid.getBidderId(),
                 "User " + bid.getBidderId()
         );
+    }
+
+    public Mono<Long> getAuctionWinnerId(Long lotId) {
+        return bidRepository.countBidsForLot(lotId)
+                .doOnNext(count -> System.out.println("Total bids in DB for lot " + lotId + ": " + count))
+                .flatMap(count -> {
+                    if (count > 0) {
+                        return bidRepository.findHighestBidByLotId(lotId)
+                                .doOnNext(bid -> {
+                                    System.out.println("=== FOUND BID FROM DB ===");
+                                    System.out.println("Bid ID: " + bid.getId());
+                                    System.out.println("Bidder ID: " + bid.getBidderId());
+                                    System.out.println("Amount: " + bid.getAmount());
+                                    System.out.println("Lot ID: " + bid.getLotId());
+                                    System.out.println("Created At: " + bid.getCreatedAt());
+                                    System.out.println("==========================");
+                                })
+                                .map(Bid::getBidderId)
+                                .doOnNext(winnerId -> System.out.println("Mapped winner ID: " + winnerId));
+                    } else {
+                        return Mono.just(0L);
+                    }
+                })
+                .doOnError(error -> {
+                    System.out.println("ERROR: " + error.getMessage());
+                })
+                .defaultIfEmpty(0L)
+                .doOnNext(finalResult -> System.out.println("FINAL RESULT: " + finalResult));
     }
 }

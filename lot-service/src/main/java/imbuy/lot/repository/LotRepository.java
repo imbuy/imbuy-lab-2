@@ -23,6 +23,4 @@ public interface LotRepository extends JpaRepository<Lot, Long> {
                             @Param("categoryId") Long categoryId,
                             @Param("ownerId") Long ownerId,
                             Pageable pageable);
-
-    Page<Lot> findByOwnerId(Long ownerId, Pageable pageable);
 }

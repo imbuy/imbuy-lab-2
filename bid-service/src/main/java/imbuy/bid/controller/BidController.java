@@ -14,6 +14,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+
 @RestController
 @RequestMapping("/bids")
 @RequiredArgsConstructor
@@ -46,9 +48,16 @@ public class BidController {
 
     @GetMapping("/lots/{lotId}/winning")
     @Operation(summary = "Get winning bid for a lot")
-    public Mono<BidDto> getWinningBid(@PathVariable Long lotId) {
-        return bidService.getWinningBid(lotId)
-                .switchIfEmpty(Mono.error(new org.springframework.web.server.ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Winning bid not found")));
+    public Long getAuctionWinner(@PathVariable Long lotId) {
+        try {
+            Long result = bidService.getAuctionWinnerId(lotId)
+                    .doOnSubscribe(s -> System.out.println("MONO SUBSCRIBED"))
+                    .doOnNext(r -> System.out.println("MONO RESULT: " + r))
+                    .block(Duration.ofSeconds(5)); // Добавляем timeout
+            return result;
+        } catch (Exception e) {
+            System.out.println("CONTROLLER ERROR: " + e.getMessage());
+            return null;
+        }
     }
 }

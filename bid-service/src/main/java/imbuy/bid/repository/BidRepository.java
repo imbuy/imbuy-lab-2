@@ -17,8 +17,19 @@ public interface BidRepository extends ReactiveCrudRepository<Bid, Long> {
 
     Mono<Bid> findFirstByLotIdOrderByAmountDesc(Long lotId);
 
+    @Query("""
+                SELECT * FROM bids 
+                WHERE lot_id = :lotId 
+                ORDER BY amount DESC, created_at DESC 
+                LIMIT 1
+            """)
+    Mono<Bid> findHighestBidByLotId(Long lotId);
+
     Mono<Long> countByLotId(Long lotId);
 
     @Query("SELECT MAX(amount) FROM bids WHERE lot_id = $1")
     Mono<BigDecimal> findMaxBidAmountByLotId(Long lotId);
+
+    @Query("SELECT COUNT(*) FROM bids WHERE lot_id = :lotId")
+    Mono<Long> countBidsForLot(Long lotId);
 }
