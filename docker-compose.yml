@@ -29,6 +29,11 @@ services:
       - postgres_user_data:/var/lib/postgresql/data
     networks:
       - imbuy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U imbuy -d user_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   postgres-category:
     image: postgres:14
@@ -43,6 +48,11 @@ services:
       - postgres_category_data:/var/lib/postgresql/data
     networks:
       - imbuy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U imbuy -d category_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   postgres-lot:
     image: postgres:14
@@ -57,6 +67,11 @@ services:
       - postgres_lot_data:/var/lib/postgresql/data
     networks:
       - imbuy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U imbuy -d lot_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   postgres-bid:
     image: postgres:14
@@ -71,6 +86,11 @@ services:
       - postgres_bid_data:/var/lib/postgresql/data
     networks:
       - imbuy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U imbuy -d bid_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # Discovery Server
   discovery-server:
@@ -126,9 +146,12 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
     depends_on:
-      - postgres-user
-      - discovery-server
-      - config-server
+      postgres-user:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      config-server:
+        condition: service_started
     networks:
       - imbuy-network
     healthcheck:
@@ -147,15 +170,21 @@ services:
       - "8081:8081"
     environment:
       - SERVER_PORT=8081
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-category:5432/category_db
+      - SPRING_DATASOURCE_USERNAME=imbuy
+      - SPRING_DATASOURCE_PASSWORD=secret
       - SPRING_R2DBC_URL=r2dbc:postgresql://postgres-category:5432/category_db
       - SPRING_R2DBC_USERNAME=imbuy
       - SPRING_R2DBC_PASSWORD=secret
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
     depends_on:
-      - postgres-category
-      - discovery-server
-      - config-server
+      postgres-category:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      config-server:
+        condition: service_started
     networks:
       - imbuy-network
     healthcheck:
@@ -180,10 +209,14 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
     depends_on:
-      - postgres-lot
-      - discovery-server
-      - config-server
-      - user-service
+      postgres-lot:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      config-server:
+        condition: service_started
+      user-service:
+        condition: service_started
     networks:
       - imbuy-network
     healthcheck:
@@ -202,15 +235,21 @@ services:
       - "8085:8085"
     environment:
       - SERVER_PORT=8085
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-bid:5432/bid_db
+      - SPRING_DATASOURCE_USERNAME=imbuy
+      - SPRING_DATASOURCE_PASSWORD=secret
       - SPRING_R2DBC_URL=r2dbc:postgresql://postgres-bid:5432/bid_db
       - SPRING_R2DBC_USERNAME=imbuy
       - SPRING_R2DBC_PASSWORD=secret
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
     depends_on:
-      - postgres-bid
-      - discovery-server
-      - config-server
+      postgres-bid:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      config-server:
+        condition: service_started
     networks:
       - imbuy-network
     healthcheck:
