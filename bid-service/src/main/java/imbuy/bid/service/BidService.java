@@ -4,6 +4,7 @@ import imbuy.bid.domain.Bid;
 import imbuy.bid.dto.BidDto;
 import imbuy.bid.dto.CreateBidDto;
 import imbuy.bid.dto.PageResponse;
+import imbuy.bid.mapper.BidMapper;
 import imbuy.bid.repository.BidRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -20,35 +21,33 @@ import java.time.LocalDateTime;
 public class BidService {
 
     private final BidRepository bidRepository;
-
+    private final BidMapper bidMapper;
     public Mono<PageResponse<BidDto>> getBidsByLotId(Long lotId, Pageable pageable) {
         return bidRepository.findByLotIdOrderByCreatedAtDesc(lotId, pageable)
-                .map(this::mapToDto)
+                .map(bidMapper::mapToDto)
                 .collectList()
-                .flatMap(bids -> {
-                    return bidRepository.countByLotId(lotId)
-                            .map(total -> {
-                                int pageNumber = pageable.getPageNumber();
-                                int pageSize = pageable.getPageSize();
-                                boolean hasNext = (pageNumber + 1) * pageSize < total;
-                                boolean hasPrevious = pageNumber > 0;
+                .flatMap(bids -> bidRepository.countByLotId(lotId)
+                        .map(total -> {
+                            int pageNumber = pageable.getPageNumber();
+                            int pageSize = pageable.getPageSize();
+                            boolean hasNext = (long) (pageNumber + 1) * pageSize < total;
+                            boolean hasPrevious = pageNumber > 0;
 
-                                return new PageResponse<>(
-                                        bids,
-                                        pageNumber,
-                                        pageSize,
-                                        hasNext,
-                                        hasPrevious
-                                );
-                            });
-                });
+                            return new PageResponse<>(
+                                    bids,
+                                    pageNumber,
+                                    pageSize,
+                                    hasNext,
+                                    hasPrevious
+                            );
+                        }));
     }
 
     public Mono<BidDto> placeBid(Long lotId, CreateBidDto createBidDto, Long currentUserId) {
         return validateBid(lotId, createBidDto.amount(), currentUserId)
                 .then(createBid(lotId, createBidDto.amount(), currentUserId))
                 .flatMap(bidRepository::save)
-                .map(this::mapToDto);
+                .map(bidMapper::mapToDto);
     }
 
     private Mono<Void> validateBid(Long lotId, BigDecimal amount, Long bidderId) {
@@ -75,15 +74,6 @@ public class BidService {
                 .createdAt(LocalDateTime.now())
                 .build();
         return Mono.just(bid);
-    }
-
-    private BidDto mapToDto(Bid bid) {
-        return new BidDto(
-                bid.getId(),
-                bid.getAmount(),
-                bid.getBidderId(),
-                "User " + bid.getBidderId()
-        );
     }
 
     public Mono<Long> getAuctionWinnerId(Long lotId) {
