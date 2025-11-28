@@ -144,14 +144,12 @@ public class LotService {
                 lot.getCurrentPrice(),
                 lot.getBidStep(),
                 lot.getOwnerId(),
-                ownerName, // username из UserService
+                ownerName,
                 lot.getCategoryId(),
                 lot.getCategoryId() != null ? "Category " + lot.getCategoryId() : null,
                 lot.getStatus(),
                 lot.getStartDate(),
                 lot.getEndDate(),
-                0, // bid_count
-                null, // rejection_reason
                 lot.getWinnerId(),
                 lot.getWinnerId() != null ? "Winner " + lot.getWinnerId() : null
         );

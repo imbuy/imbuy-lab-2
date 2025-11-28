@@ -11,8 +11,7 @@ public class UserMapper {
         return new UserDto(
                 user.getId(),
                 user.getEmail(),
-                user.getUsername(),
-                user.getBalance() != null ? user.getBalance().toString() : "0.00"
+                user.getUsername()
         );
     }
 }

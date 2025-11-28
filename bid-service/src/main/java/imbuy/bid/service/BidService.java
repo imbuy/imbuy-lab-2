@@ -51,21 +51,6 @@ public class BidService {
                 .map(this::mapToDto);
     }
 
-    public Mono<BidDto> getWinningBid(Long lotId) {
-        return bidRepository.findHighestBidByLotId(lotId)
-                .map(this::mapToDto)
-                .switchIfEmpty(Mono.empty());
-    }
-
-    public Mono<Integer> countBidsByLot(Long lotId) {
-        return bidRepository.countByLotId(lotId)
-                .map(Math::toIntExact);
-    }
-
-    public Mono<Bid> getHighestBidByLot(Long lotId) {
-        return bidRepository.findHighestBidByLotId(lotId);
-    }
-
     private Mono<Void> validateBid(Long lotId, BigDecimal amount, Long bidderId) {
         return bidRepository.findMaxBidAmountByLotId(lotId)
                 .flatMap(maxBid -> {

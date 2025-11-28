@@ -77,20 +77,4 @@ public class UserService {
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(userOpt -> userOpt.map(user -> Mono.just(userMapper.mapToDto(user))).orElseGet(() -> Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"))));
     }
-
-    public Mono<User> getUserEntityById(Long id) {
-        return Mono.fromCallable(() -> userRepository.findById(id))
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(userOpt -> userOpt.<Mono<? extends User>>map(Mono::just).orElseGet(() -> Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"))));
-    }
-
-    public Mono<UserDto> updateBalance(Long userId, String balance) {
-        return getUserEntityById(userId)
-                .map(user -> user.toBuilder()
-                        .balance(new BigDecimal(balance))
-                        .build())
-                .flatMap(updatedUser -> Mono.fromCallable(() -> userRepository.save(updatedUser))
-                        .subscribeOn(Schedulers.boundedElastic()))
-                .map(userMapper::mapToDto);
-    }
 }

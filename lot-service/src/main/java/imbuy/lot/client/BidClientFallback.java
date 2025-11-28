@@ -10,6 +10,6 @@ public class BidClientFallback implements BidClient {
     @Override
     public Long getAuctionWinner(Long lotId) {
         log.warn("Bid service unavailable. Cannot determine winner for lot #{}", lotId);
-        return null; // Возвращаем null если сервис недоступен
+        return null;
     }
 }

@@ -9,9 +9,8 @@ public class UserClientFallback implements UserClient {
     public UserDto getUserById(Long id) {
         return new UserDto(
                 id,
-                "unknown@example.com", // email
-                "Unknown (fallback)", // username
-                "0.00" // balance
+                "unknown@example.com",
+                "Unknown (fallback)"
         );
     }
 }
