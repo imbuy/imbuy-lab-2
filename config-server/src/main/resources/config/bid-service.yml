@@ -8,14 +8,15 @@ spring:
     url: jdbc:postgresql://localhost:5436/bid_db
     username: imbuy
     password: secret
+    driver-class-name: org.postgresql.Driver
   r2dbc:
     url: r2dbc:postgresql://localhost:5436/bid_db
     username: imbuy
     password: secret
-  liquibase:
-    change-log: classpath:db/changelog/db.changelog-master.xml
+  flyway:
     enabled: true
-    initialize-mode: always
+    locations: classpath:db/migration
+    baseline-on-migrate: true
 
 springdoc:
   api-docs:
@@ -37,4 +38,6 @@ management:
 logging:
   level:
     imbuy.bid: DEBUG
+    org.flywaydb: INFO
+    org.springframework.boot.autoconfigure.flyway: DEBUG
 

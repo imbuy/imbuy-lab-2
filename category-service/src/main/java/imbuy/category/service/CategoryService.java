@@ -56,7 +56,7 @@ public class CategoryService {
         return categoryRepository.findAll()
                 .skip(pageable.getOffset())
                 .take(pageable.getPageSize())
-                .map(categoryMapper::mapToDto)
+                .map(categoryMapper::toDto)
                 .collectList()
                 .flatMap(categories -> {
                     return categoryRepository.count()
@@ -88,7 +88,7 @@ public class CategoryService {
                             : Mono.just("");
                     
                     Mono<List<CategoryDto>> childrenMono = categoryRepository.findByParentId(id)
-                            .map(categoryMapper::mapToDto)
+                            .map(categoryMapper::toDto)
                             .collectList();
                     
                     return Mono.zip(parentNameMono, childrenMono)
@@ -126,7 +126,7 @@ public class CategoryService {
                 .build();
         
         return categoryRepository.save(category)
-                .map(categoryMapper::mapToDto);
+                .map(categoryMapper::toDto);
     }
 
     public Mono<CategoryDto> updateCategory(Long id, CategoryDto categoryDto) {
@@ -151,7 +151,7 @@ public class CategoryService {
                     return category;
                 })
                 .flatMap(categoryRepository::save)
-                .map(categoryMapper::mapToDto);
+                .map(categoryMapper::toDto);
     }
 
     public Mono<Void> deleteCategory(Long id) {

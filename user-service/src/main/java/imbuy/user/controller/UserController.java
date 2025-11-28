@@ -53,13 +53,4 @@ public class UserController {
 
         return userService.updateProfile(id, request);
     }
-
-    @PutMapping("/{id}/balance")
-    @Operation(summary = "Update user balance")
-    public Mono<UserDto> updateBalance(
-            @PathVariable Long id,
-            @RequestParam String balance) {
-
-        return userService.updateBalance(id, balance);
-    }
 }
