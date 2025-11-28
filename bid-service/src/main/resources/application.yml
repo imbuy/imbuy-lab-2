@@ -2,34 +2,8 @@ spring:
   application:
     name: bid-service
   config:
-    import: "optional:configserver:http://localhost:8888"
-  datasource:
-    url: jdbc:postgresql://localhost:5436/bid_db
-    username: imbuy
-    password: secret
-    driver-class-name: org.postgresql.Driver
-  r2dbc:
-    url: r2dbc:postgresql://localhost:5436/bid_db
-    username: imbuy
-    password: secret
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
+    import: "optional:configserver:http://config-server:8888"
 
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
-    enabled: true
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka
-  instance:
-    prefer-ip-address: true
 
 logging:
   level:

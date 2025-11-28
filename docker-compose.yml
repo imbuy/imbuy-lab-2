@@ -2,20 +2,6 @@ version: '3.8'
 
 services:
   # Базы данных
-  postgres-auth:
-    image: postgres:14
-    container_name: postgres-auth
-    environment:
-      POSTGRES_DB: auth_db
-      POSTGRES_USER: imbuy
-      POSTGRES_PASSWORD: secret
-      TZ: Europe/Moscow
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_auth_data:/var/lib/postgresql/data
-    networks:
-      - imbuy-network
 
   postgres-user:
     image: postgres:14
@@ -299,7 +285,6 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_auth_data:
   postgres_user_data:
   postgres_category_data:
   postgres_lot_data:
