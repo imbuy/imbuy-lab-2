@@ -20,8 +20,6 @@ public record LotDto(
         LotStatus status,
         LocalDateTime start_date,
         LocalDateTime end_date,
-        Integer bid_count,
-        String rejection_reason,
         Long winner_id,
         String winner_username
 ) {}

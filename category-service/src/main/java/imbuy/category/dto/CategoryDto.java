@@ -10,7 +10,7 @@ public record CategoryDto(
         @NotBlank(message = "Category name is required")
         String name,
         Long parent_id,
-        String parent_name,
+//        String parent_name,
         @JsonProperty(value = "children", access = JsonProperty.Access.READ_ONLY)
         List<CategoryDto> children
 ) {}

@@ -36,10 +36,6 @@ public class User {
     @Size(max = 100)
     private String username;
 
-    @Column(precision = 19, scale = 2)
-    @Builder.Default
-    private BigDecimal balance = BigDecimal.ZERO;
-
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;

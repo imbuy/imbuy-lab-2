@@ -15,8 +15,6 @@ public interface BidRepository extends ReactiveCrudRepository<Bid, Long> {
     
     Flux<Bid> findByLotIdOrderByCreatedAtDesc(Long lotId, Pageable pageable);
 
-    Mono<Bid> findFirstByLotIdOrderByAmountDesc(Long lotId);
-
     @Query("""
                 SELECT * FROM bids 
                 WHERE lot_id = :lotId 
