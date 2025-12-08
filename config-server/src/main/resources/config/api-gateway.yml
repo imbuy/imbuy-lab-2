@@ -11,23 +11,65 @@ spring:
           enabled: true
           lower-case-service-id: true
       routes:
+        - id: user-service-swagger
+          uri: lb://user-service
+          predicates:
+            - Path=/api/v1/users/v3/api-docs
+          filters:
+            - StripPrefix=3
         - id: user-service
           uri: lb://user-service
           predicates:
             - Path=/users/**
+        - id: category-service-swagger
+          uri: lb://category-service
+          predicates:
+            - Path=/api/v1/categories/v3/api-docs
+          filters:
+            - StripPrefix=3
         - id: category-service
           uri: lb://category-service
           predicates:
             - Path=/categories/**
+        - id: lot-service-swagger
+          uri: lb://lot-service
+          predicates:
+            - Path=/api/v1/lots/v3/api-docs
+          filters:
+            - StripPrefix=3
         - id: lot-service
           uri: lb://lot-service
           predicates:
             - Path=/lots/**
+        - id: bid-service-swagger
+          uri: lb://bid-service
+          predicates:
+            - Path=/api/v1/bids/v3/api-docs
+          filters:
+            - StripPrefix=3
         - id: bid-service
           uri: lb://bid-service
           predicates:
             - Path=/bids/**
 
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui/index.html
+    config-url: /v3/api-docs/swagger-config
+    urls:
+      - url: /v3/api-docs
+        name: API Gateway Service
+      - url: /api/v1/users/v3/api-docs
+        name: User Service
+      - url: /api/v1/lots/v3/api-docs
+        name: Lot Service
+      - url: /api/v1/categories/v3/api-docs
+        name: Category Service
+      - url: /api/v1/bids/v3/api-docs
+        name: Bid Service
 management:
   endpoints:
     web:
