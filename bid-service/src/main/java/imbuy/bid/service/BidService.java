@@ -3,7 +3,6 @@ package imbuy.bid.service;
 import imbuy.bid.domain.Bid;
 import imbuy.bid.dto.BidDto;
 import imbuy.bid.dto.CreateBidDto;
-import imbuy.bid.dto.PageResponse;
 import imbuy.bid.mapper.BidMapper;
 import imbuy.bid.repository.BidRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
@@ -22,25 +22,10 @@ public class BidService {
 
     private final BidRepository bidRepository;
     private final BidMapper bidMapper;
-    public Mono<PageResponse<BidDto>> getBidsByLotId(Long lotId, Pageable pageable) {
-        return bidRepository.findByLotIdOrderByCreatedAtDesc(lotId, pageable)
-                .map(bidMapper::mapToDto)
-                .collectList()
-                .flatMap(bids -> bidRepository.countByLotId(lotId)
-                        .map(total -> {
-                            int pageNumber = pageable.getPageNumber();
-                            int pageSize = pageable.getPageSize();
-                            boolean hasNext = (long) (pageNumber + 1) * pageSize < total;
-                            boolean hasPrevious = pageNumber > 0;
 
-                            return new PageResponse<>(
-                                    bids,
-                                    pageNumber,
-                                    pageSize,
-                                    hasNext,
-                                    hasPrevious
-                            );
-                        }));
+    public Flux<BidDto> getBidsByLotId(Long lotId, Pageable pageable) {
+        return bidRepository.findByLotIdOrderByCreatedAtDesc(lotId, pageable)
+                .map(bidMapper::mapToDto);
     }
 
     public Mono<BidDto> placeBid(Long lotId, CreateBidDto createBidDto, Long currentUserId) {
