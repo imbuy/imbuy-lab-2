@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 
 @Repository
 public interface BidRepository extends ReactiveCrudRepository<Bid, Long> {
-    
+
     Flux<Bid> findByLotIdOrderByCreatedAtDesc(Long lotId, Pageable pageable);
 
     @Query("""

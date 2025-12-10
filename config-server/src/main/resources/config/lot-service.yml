@@ -4,10 +4,6 @@ server:
 spring:
   application:
     name: lot-service
-  datasource:
-    url: jdbc:postgresql://localhost:5435/lot_db
-    username: imbuy
-    password: secret
   jpa:
     hibernate:
       ddl-auto: validate

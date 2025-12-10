@@ -4,11 +4,6 @@ server:
 spring:
   application:
     name: bid-service
-  datasource:
-    url: jdbc:postgresql://localhost:5436/bid_db
-    username: imbuy
-    password: secret
-    driver-class-name: org.postgresql.Driver
   r2dbc:
     url: r2dbc:postgresql://localhost:5436/bid_db
     username: imbuy
