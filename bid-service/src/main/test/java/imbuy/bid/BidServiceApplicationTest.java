@@ -3,7 +3,6 @@ package imbuy.bid;
 import imbuy.bid.domain.Bid;
 import imbuy.bid.dto.BidDto;
 import imbuy.bid.dto.CreateBidDto;
-import imbuy.bid.dto.PageResponse;
 import imbuy.bid.mapper.BidMapper;
 import imbuy.bid.repository.BidRepository;
 import imbuy.bid.service.BidService;
@@ -22,6 +21,7 @@ import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -101,18 +101,44 @@ class BidServiceApplicationTest {
                 .build();
         bidRepository.save(anotherBid).block();
 
-        PageResponse<BidDto> result = bidService.getBidsByLotId(testLotId,
-                PageRequest.of(0, 10)).block();
+        List<BidDto> result = bidService.getBidsByLotId(testLotId,
+                        PageRequest.of(0, 10))
+                .collectList()
+                .block();
 
         assertNotNull(result);
-        assertEquals(2, result.content().size());
-        assertEquals(0, result.current_page());
-        assertEquals(10, result.page_size());
-        assertFalse(result.has_next());
-        assertFalse(result.has_previous());
+        assertEquals(2, result.size());
 
-        assertEquals(new BigDecimal("150.00"), result.content().get(0).amount());
-        assertEquals(new BigDecimal("100.00"), result.content().get(1).amount());
+        assertEquals(new BigDecimal("150.00"), result.get(0).amount());
+        assertEquals(new BigDecimal("100.00"), result.get(1).amount());
+    }
+
+    @Test
+    void getBidsByLotId_shouldReturnCorrectPageSize() {
+        for (int i = 0; i < 15; i++) {
+            Bid bid = Bid.builder()
+                    .lotId(testLotId)
+                    .bidderId((long) i)
+                    .amount(new BigDecimal(200 + i * 10 + ".00"))
+                    .createdAt(LocalDateTime.now().plusMinutes(i))
+                    .build();
+            bidRepository.save(bid).block();
+        }
+
+        List<BidDto> page1 = bidService.getBidsByLotId(testLotId,
+                        PageRequest.of(0, 10))
+                .collectList()
+                .block();
+
+        List<BidDto> page2 = bidService.getBidsByLotId(testLotId,
+                        PageRequest.of(1, 10))
+                .collectList()
+                .block();
+
+        assertNotNull(page1);
+        assertNotNull(page2);
+        assertEquals(10, page1.size());
+        assertEquals(6, page2.size());
     }
 
     @Test
@@ -190,11 +216,13 @@ class BidServiceApplicationTest {
         assertNotNull(bid2);
         assertEquals(bid2.id(), mappedDto.id());
 
-        PageResponse<BidDto> page = bidService.getBidsByLotId(10L,
-                PageRequest.of(0, 10)).block();
+        List<BidDto> page = bidService.getBidsByLotId(10L,
+                        PageRequest.of(0, 10))
+                .collectList()
+                .block();
         assertNotNull(page);
-        assertEquals(2, page.content().size());
-        assertEquals(bid2.amount(), page.content().get(0).amount());
+        assertEquals(2, page.size());
+        assertEquals(bid2.amount(), page.get(0).amount());
     }
 
     @Test
@@ -234,5 +262,26 @@ class BidServiceApplicationTest {
 
         assertNotNull(result);
         assertEquals(new BigDecimal("50.00"), result.amount());
+    }
+
+    @Test
+    void getBidsByLotId_withLargePageSize_shouldRespectMaxSize() {
+        for (int i = 0; i < 30; i++) {
+            Bid bid = Bid.builder()
+                    .lotId(testLotId)
+                    .bidderId((long) i)
+                    .amount(new BigDecimal(300 + i * 10 + ".00"))
+                    .createdAt(LocalDateTime.now().plusMinutes(i))
+                    .build();
+            bidRepository.save(bid).block();
+        }
+
+        List<BidDto> result = bidService.getBidsByLotId(testLotId,
+                        PageRequest.of(0, 100))
+                .collectList()
+                .block();
+
+        assertNotNull(result);
+        assertEquals(31, result.size());
     }
 }

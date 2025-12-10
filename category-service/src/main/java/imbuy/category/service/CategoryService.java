@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -41,29 +42,11 @@ public class CategoryService {
                 ));
     }
 
-    public Mono<PageResponse<CategoryResponse>> getAllCategories(Pageable pageable) {
+    public Flux<CategoryResponse> getAllCategories(Pageable pageable) {
         return categoryRepository.findAll()
                 .skip(pageable.getOffset())
                 .take(pageable.getPageSize())
-                .map(categoryMapper::toResponse)
-                .collectList()
-                .flatMap(categories -> {
-                    return categoryRepository.count()
-                            .map(total -> {
-                                int pageNumber = pageable.getPageNumber();
-                                int pageSize = pageable.getPageSize();
-                                boolean hasNext = (pageNumber + 1) * pageSize < total;
-                                boolean hasPrevious = pageNumber > 0;
-
-                                return new PageResponse<>(
-                                        categories,
-                                        pageNumber,
-                                        pageSize,
-                                        hasNext,
-                                        hasPrevious
-                                );
-                            });
-                });
+                .map(categoryMapper::toResponse);
     }
 
     public Mono<CategoryResponse> getCategoryById(Long id) {
@@ -132,16 +115,14 @@ public class CategoryService {
     public Mono<Void> deleteCategory(Long id) {
         return categoryRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found")))
-                .flatMap(category -> {
-                    return categoryRepository.findByParentId(id)
-                            .hasElements()
-                            .flatMap(hasChildren -> {
-                                if (Boolean.TRUE.equals(hasChildren)) {
-                                    return Mono.error(new ResponseStatusException(
-                                            HttpStatus.BAD_REQUEST, "Cannot delete category with subcategories"));
-                                }
-                                return categoryRepository.deleteById(id);
-                            });
-                });
+                .flatMap(category -> categoryRepository.findByParentId(id)
+                        .hasElements()
+                        .flatMap(hasChildren -> {
+                            if (Boolean.TRUE.equals(hasChildren)) {
+                                return Mono.error(new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST, "Cannot delete category with subcategories"));
+                            }
+                            return categoryRepository.deleteById(id);
+                        }));
     }
 }

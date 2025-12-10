@@ -100,15 +100,50 @@ class CategoryServiceApplicationTest {
 
     @Test
     void getAllCategories_shouldReturnPaginated() {
-        PageResponse<CategoryResponse> result = categoryService.getAllCategories(
-                PageRequest.of(0, 10)).block();
+        List<CategoryResponse> result = categoryService.getAllCategories(
+                        PageRequest.of(0, 10))
+                .collectList()
+                .block();
 
         assertNotNull(result);
-        assertEquals(3, result.content().size());
-        assertEquals(0, result.page());
-        assertEquals(10, result.size());
-        assertFalse(result.hasNext());
-        assertFalse(result.hasPrevious());
+        assertEquals(3, result.size());
+
+        List<String> categoryNames = result.stream()
+                .map(CategoryResponse::name)
+                .toList();
+        assertTrue(categoryNames.contains("Electronics"));
+        assertTrue(categoryNames.contains("Laptops"));
+        assertTrue(categoryNames.contains("Phones"));
+    }
+
+    @Test
+    void getAllCategories_shouldReturnCorrectPageSize() {
+        for (int i = 0; i < 7; i++) {
+            Category category = Category.builder()
+                    .name("Category " + i)
+                    .parentId(null)
+                    .build();
+            categoryRepository.save(category).block();
+        }
+
+        List<CategoryResponse> page1 = categoryService.getAllCategories(
+                        PageRequest.of(0, 5))
+                .collectList()
+                .block();
+
+        List<CategoryResponse> page2 = categoryService.getAllCategories(
+                        PageRequest.of(1, 5))
+                .collectList()
+                .block();
+
+        assertNotNull(page1);
+        assertNotNull(page2);
+        assertEquals(5, page1.size());
+        assertEquals(5, page2.size());
+
+        List<Long> page1Ids = page1.stream().map(CategoryResponse::id).toList();
+        List<Long> page2Ids = page2.stream().map(CategoryResponse::id).toList();
+        assertTrue(page1Ids.stream().noneMatch(page2Ids::contains));
     }
 
     @Test
@@ -414,25 +449,25 @@ class CategoryServiceApplicationTest {
             categoryRepository.save(category).block();
         }
 
-        PageResponse<CategoryResponse> page1 = categoryService.getAllCategories(
-                PageRequest.of(0, 10)).block();
+        List<CategoryResponse> page1 = categoryService.getAllCategories(
+                        PageRequest.of(0, 10))
+                .collectList()
+                .block();
 
-        PageResponse<CategoryResponse> page2 = categoryService.getAllCategories(
-                PageRequest.of(1, 10)).block();
+        List<CategoryResponse> page2 = categoryService.getAllCategories(
+                        PageRequest.of(1, 10))
+                .collectList()
+                .block();
 
         assertNotNull(page1);
-        assertEquals(10, page1.content().size());
-        assertEquals(0, page1.page());
         assertEquals(10, page1.size());
-        assertTrue(page1.hasNext());
-        assertFalse(page1.hasPrevious());
 
         assertNotNull(page2);
-        assertEquals(8, page2.content().size()); // 3 оригинальные + 15 новых = 18, на второй странице 8
-        assertEquals(1, page2.page());
-        assertEquals(10, page2.size());
-        assertFalse(page2.hasNext());
-        assertTrue(page2.hasPrevious());
+        assertEquals(8, page2.size());
+
+        List<Long> page1Ids = page1.stream().map(CategoryResponse::id).toList();
+        List<Long> page2Ids = page2.stream().map(CategoryResponse::id).toList();
+        assertTrue(page1Ids.stream().noneMatch(page2Ids::contains));
     }
 
     @Test
@@ -444,5 +479,16 @@ class CategoryServiceApplicationTest {
 
         assertEquals("Updated Name", existingCategory.getName());
         assertEquals(999L, existingCategory.getParentId());
+    }
+
+    @Test
+    void getAllCategories_withLargePageSize_shouldRespectMaxSize() {
+        List<CategoryResponse> result = categoryService.getAllCategories(
+                        PageRequest.of(0, 100))
+                .collectList()
+                .block();
+
+        assertNotNull(result);
+        assertTrue(result.size() <= 3);
     }
 }

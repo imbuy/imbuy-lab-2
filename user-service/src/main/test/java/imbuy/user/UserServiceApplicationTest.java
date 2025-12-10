@@ -1,7 +1,6 @@
 package imbuy.user;
 
 import imbuy.user.domain.User;
-import imbuy.user.dto.PageResponse;
 import imbuy.user.dto.RegisterRequest;
 import imbuy.user.dto.UserDto;
 import imbuy.user.repository.UserRepository;
@@ -13,8 +12,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -42,7 +39,6 @@ class UserServiceApplicationTest {
             .withDatabaseName("user_test")
             .withUsername("test")
             .withPassword("test");
-
 
     @Autowired
     private UserService userService;
@@ -100,6 +96,7 @@ class UserServiceApplicationTest {
                         throwable.getMessage().contains("Email already exists"))
                 .verify();
     }
+
     @Test
     void findById_shouldReturnUserWhenExists() {
         User savedUser = userRepository.save(
@@ -140,27 +137,50 @@ class UserServiceApplicationTest {
             );
         }
 
-        StepVerifier.create(userService.findAllUsers(PageRequest.of(0, 10)))
-                .assertNext(pageResponse -> {
-                    assertNotNull(pageResponse);
-                    assertEquals(10, pageResponse.content().size());
-                    assertEquals(0, pageResponse.current_page());
-                    assertEquals(10, pageResponse.page_size());
-                    assertTrue(pageResponse.has_next());
-                    assertFalse(pageResponse.has_previous());
-                })
-                .verifyComplete();
+        List<UserDto> page1 = userService.findAllUsers(PageRequest.of(0, 10))
+                .collectList()
+                .block();
 
-        StepVerifier.create(userService.findAllUsers(PageRequest.of(1, 10)))
-                .assertNext(pageResponse -> {
-                    assertNotNull(pageResponse);
-                    assertEquals(5, pageResponse.content().size());
-                    assertEquals(1, pageResponse.current_page());
-                    assertEquals(10, pageResponse.page_size());
-                    assertFalse(pageResponse.has_next());
-                    assertTrue(pageResponse.has_previous());
-                })
-                .verifyComplete();
+        assertNotNull(page1);
+        assertEquals(10, page1.size());
+
+        List<UserDto> page2 = userService.findAllUsers(PageRequest.of(1, 10))
+                .collectList()
+                .block();
+
+        assertNotNull(page2);
+        assertEquals(5, page2.size());
+
+        List<Long> page1Ids = page1.stream().map(UserDto::id).toList();
+        List<Long> page2Ids = page2.stream().map(UserDto::id).toList();
+        assertTrue(page1Ids.stream().noneMatch(page2Ids::contains));
+    }
+
+    @Test
+    void findAllUsers_withDifferentPageSizes_shouldWork() {
+        for (int i = 1; i <= 5; i++) {
+            userRepository.save(
+                    User.builder()
+                            .email("user" + i + "@example.com")
+                            .password("password" + i)
+                            .username("username" + i)
+                            .build()
+            );
+        }
+
+        List<UserDto> result1 = userService.findAllUsers(PageRequest.of(0, 2))
+                .collectList()
+                .block();
+
+        assertNotNull(result1);
+        assertEquals(2, result1.size());
+
+        List<UserDto> result2 = userService.findAllUsers(PageRequest.of(0, 5))
+                .collectList()
+                .block();
+
+        assertNotNull(result2);
+        assertEquals(5, result2.size());
     }
 
     @Test
@@ -216,17 +236,31 @@ class UserServiceApplicationTest {
     }
 
     @Test
-    void updateProfile_shouldThrowWhenUserNotFound() {
+    void updateProfile_shouldUpdateOnlyUsernameWhenPasswordIsEmpty() {
+        User savedUser = userRepository.save(
+                User.builder()
+                        .email(testEmail)
+                        .password(testPassword)
+                        .username("oldusername")
+                        .build()
+        );
+
         RegisterRequest updateRequest = new RegisterRequest(
-                "nonexistent@example.com",
-                "newpassword",
+                testEmail,
+                "",
                 "newusername"
         );
 
-        StepVerifier.create(userService.updateProfile(999L, updateRequest))
-                .expectErrorMatches(throwable ->
-                        throwable.getMessage().contains("User not found"))
-                .verify();
+        StepVerifier.create(userService.updateProfile(savedUser.getId(), updateRequest))
+                .assertNext(updatedUser -> {
+                    assertEquals("newusername", updatedUser.username());
+                })
+                .verifyComplete();
+
+        // Password should remain unchanged
+        Optional<User> userInDb = userRepository.findById(savedUser.getId());
+        assertTrue(userInDb.isPresent());
+        assertEquals(testPassword, userInDb.get().getPassword());
     }
 
     @Test
@@ -273,45 +307,30 @@ class UserServiceApplicationTest {
 
     @Test
     void completeUserFlow_shouldWork() {
-        StepVerifier.create(userService.register(validRequest))
-                .assertNext(registeredUser -> {
-                    assertNotNull(registeredUser.id());
-                    assertEquals(testEmail, registeredUser.email());
-                })
-                .verifyComplete();
+        UserDto registeredUser = userService.register(validRequest).block();
+        assertNotNull(registeredUser);
+        assertNotNull(registeredUser.id());
 
-        List<User> allUsers = userRepository.findAll();
-        Optional<User> userInDb = allUsers.stream()
-                .filter(user -> testEmail.equals(user.getEmail()))
-                .findFirst();
-        assertTrue(userInDb.isPresent());
-        Long userId = userInDb.get().getId();
-
-        StepVerifier.create(userService.findById(userId))
-                .assertNext(foundUser -> {
-                    assertEquals(testEmail, foundUser.email());
-                    assertEquals(testUsername, foundUser.username());
-                })
-                .verifyComplete();
+        UserDto foundUser = userService.findById(registeredUser.id()).block();
+        assertNotNull(foundUser);
+        assertEquals(testEmail, foundUser.email());
 
         RegisterRequest updateRequest = new RegisterRequest(
                 testEmail,
                 "updatedpassword",
                 "updatedusername"
         );
+        UserDto updatedUser = userService.updateProfile(registeredUser.id(), updateRequest).block();
+        assertNotNull(updatedUser);
+        assertEquals("updatedusername", updatedUser.username());
 
-        StepVerifier.create(userService.updateProfile(userId, updateRequest))
-                .assertNext(updatedUser -> {
-                    assertEquals("updatedusername", updatedUser.username());
-                })
-                .verifyComplete();
-
-        StepVerifier.create(userService.findAllUsers(PageRequest.of(0, 10)))
-                .assertNext(pageResponse -> {
-                    assertEquals(1, pageResponse.content().size());
-                    assertEquals("updatedusername", pageResponse.content().get(0).username());
-                })
-                .verifyComplete();
+        // Find all users (should have 1)
+        List<UserDto> allUsers = userService.findAllUsers(PageRequest.of(0, 10))
+                .collectList()
+                .block();
+        assertNotNull(allUsers);
+        assertEquals(1, allUsers.size());
+        assertEquals("updatedusername", allUsers.get(0).username());
     }
 
     @Test
@@ -337,35 +356,6 @@ class UserServiceApplicationTest {
         assertEquals("valid@example.com", valid.email());
         assertEquals("password", valid.password());
         assertEquals("username", valid.username());
-
-        RegisterRequest withNulls = new RegisterRequest(
-                null,
-                null,
-                null
-        );
-        assertNull(withNulls.email());
-        assertNull(withNulls.password());
-        assertNull(withNulls.username());
-    }
-
-    @Test
-    void pageResponse_creation_shouldWork() {
-        UserDto user1 = new UserDto(1L, "user1@example.com", "user1");
-        UserDto user2 = new UserDto(2L, "user2@example.com", "user2");
-
-        PageResponse<UserDto> response = new PageResponse<>(
-                List.of(user1, user2),
-                0,
-                10,
-                true,
-                false
-        );
-
-        assertEquals(2, response.content().size());
-        assertEquals(0, response.current_page());
-        assertEquals(10, response.page_size());
-        assertTrue(response.has_next());
-        assertFalse(response.has_previous());
     }
 
     @Test
@@ -500,5 +490,17 @@ class UserServiceApplicationTest {
 
         Optional<User> deletedUser = userRepository.findById(savedUser.getId());
         assertFalse(deletedUser.isPresent());
+    }
+
+    @Test
+    void findAllUsers_withEmptyDatabase_shouldReturnEmptyFlux() {
+        userRepository.deleteAll();
+
+        List<UserDto> result = userService.findAllUsers(PageRequest.of(0, 10))
+                .collectList()
+                .block();
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
     }
 }

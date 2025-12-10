@@ -2,7 +2,6 @@ package imbuy.bid.controller;
 
 import imbuy.bid.dto.BidDto;
 import imbuy.bid.dto.CreateBidDto;
-import imbuy.bid.dto.PageResponse;
 import imbuy.bid.service.BidService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,6 +11,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
@@ -26,7 +26,7 @@ public class BidController {
 
     @GetMapping("/lots/{lotId}")
     @Operation(summary = "Get bid history for a lot")
-    public Mono<PageResponse<BidDto>> getBidsByLotId(
+    public Flux<BidDto> getBidsByLotId(
             @PathVariable Long lotId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -50,13 +50,11 @@ public class BidController {
     @Operation(summary = "Get winning bid for a lot")
     public Long getAuctionWinner(@PathVariable Long lotId) {
         try {
-            Long result = bidService.getAuctionWinnerId(lotId)
+            return bidService.getAuctionWinnerId(lotId)
                     .doOnSubscribe(s -> System.out.println("MONO SUBSCRIBED"))
                     .doOnNext(r -> System.out.println("MONO RESULT: " + r))
-                    .block(Duration.ofSeconds(5)); // Добавляем timeout
-            return result;
+                    .block(Duration.ofSeconds(5));
         } catch (Exception e) {
-            System.out.println("CONTROLLER ERROR: " + e.getMessage());
             return null;
         }
     }
