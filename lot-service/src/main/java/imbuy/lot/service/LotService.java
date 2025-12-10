@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -27,9 +28,9 @@ public class LotService {
     private final LotRepository lotRepository;
 
     @CircuitBreaker(name = "userServiceClient", fallbackMethod = "getLotsFallback")
-    public PageResponse<LotDto> getLots(LotFilterDto filter, Pageable pageable, Long currentUserId) {
+    public List<LotDto> getLots(LotFilterDto filter, Pageable pageable, Long currentUserId) {
         Page<Lot> lots = findLotsByFilter(filter, pageable);
-        return PageResponse.of(lots.map(this::mapToDtoWithUserInfo));
+        return lots.map(this::mapToDtoWithUserInfo).getContent();
     }
 
     @CircuitBreaker(name = "userServiceClient", fallbackMethod = "getLotByIdFallback")
@@ -50,10 +51,10 @@ public class LotService {
         return mapToDtoWithUserInfo(savedLot);
     }
 
-    public PageResponse<LotDto> getLotsFallback(LotFilterDto filter, Pageable pageable, Long currentUserId, Exception e) {
+    public List<LotDto> getLotsFallback(LotFilterDto filter, Pageable pageable, Long currentUserId, Exception e) {
         log.warn("Circuit Breaker fallback for getLots. Error: {}", e.getMessage());
         Page<Lot> lots = findLotsByFilter(filter, pageable);
-        return PageResponse.of(lots.map(this::createBasicLotDto));
+        return lots.map(this::createBasicLotDto).getContent();
     }
 
     public LotDto getLotByIdFallback(Long id, Exception e) {
