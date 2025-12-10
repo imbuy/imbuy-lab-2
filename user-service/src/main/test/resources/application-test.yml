@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: user-service-test
+  r2dbc:
+    pool:
+      enabled: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    clean-disabled: true
+    locations: classpath:db/migration
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false

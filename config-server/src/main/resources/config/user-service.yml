@@ -4,10 +4,6 @@ server:
 spring:
   application:
     name: user-service
-  datasource:
-    url: jdbc:postgresql://localhost:5433/user_db
-    username: imbuy
-    password: secret
   jpa:
     hibernate:
       ddl-auto: validate
