@@ -1,0 +1,428 @@
+package imbuy.category;
+
+import imbuy.category.domain.Category;
+import imbuy.category.dto.CategoryDto;
+import imbuy.category.dto.CategoryTreeDto;
+import imbuy.category.dto.PageResponse;
+import imbuy.category.mapper.CategoryMapper;
+import imbuy.category.repository.CategoryRepository;
+import imbuy.category.service.CategoryService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import reactor.test.StepVerifier;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest
+@ActiveProfiles("test")
+@Testcontainers
+@TestPropertySource(properties = {
+        "spring.cloud.config.enabled=false",
+        "eureka.client.enabled=false"
+})
+class CategoryServiceApplicationTest {
+
+    @Container
+    @ServiceConnection
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
+            .withDatabaseName("category_test")
+            .withUsername("test")
+            .withPassword("test")
+            .withReuse(true);
+
+    @Autowired
+    private CategoryService categoryService;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
+    private CategoryMapper categoryMapper;
+
+    private Category parentCategory;
+    private Category childCategory1;
+    private Category childCategory2;
+
+    @BeforeEach
+    void beforeEach() {
+        categoryRepository.deleteAll().block();
+
+        parentCategory = Category.builder()
+                .name("Electronics")
+                .parentId(null)
+                .build();
+
+        parentCategory = categoryRepository.save(parentCategory).block();
+
+        childCategory1 = Category.builder()
+                .name("Laptops")
+                .parentId(parentCategory.getId())
+                .build();
+
+        childCategory2 = Category.builder()
+                .name("Phones")
+                .parentId(parentCategory.getId())
+                .build();
+
+        childCategory1 = categoryRepository.save(childCategory1).block();
+        childCategory2 = categoryRepository.save(childCategory2).block();
+    }
+
+    @Test
+    void getCategoryTree_shouldReturnHierarchy() {
+        CategoryTreeDto tree = categoryService.getCategoryTree().block();
+
+        assertNotNull(tree);
+        assertNotNull(tree.categories());
+        assertEquals(1, tree.categories().size());
+
+        CategoryDto root = tree.categories().get(0);
+        assertEquals("Electronics", root.name());
+        assertNull(root.parent_id());
+        assertNotNull(root.children());
+        assertEquals(2, root.children().size());
+
+        List<String> childNames = root.children().stream()
+                .map(CategoryDto::name)
+                .toList();
+        assertTrue(childNames.contains("Laptops"));
+        assertTrue(childNames.contains("Phones"));
+    }
+
+    @Test
+    void getAllCategories_shouldReturnPaginated() {
+        PageResponse<CategoryDto> result = categoryService.getAllCategories(
+                PageRequest.of(0, 10)).block();
+
+        assertNotNull(result);
+        assertEquals(3, result.content().size());
+        assertEquals(0, result.current_page());
+        assertEquals(10, result.page_size());
+        assertFalse(result.has_next());
+        assertFalse(result.has_previous());
+    }
+
+    @Test
+    void getCategoryById_shouldReturnWithChildren() {
+        CategoryDto result = categoryService.getCategoryById(parentCategory.getId()).block();
+
+        assertNotNull(result);
+        assertEquals("Electronics", result.name());
+        assertNull(result.parent_id());
+        assertNotNull(result.children());
+        assertEquals(2, result.children().size());
+    }
+
+    @Test
+    void getCategoryById_shouldThrowWhenNotFound() {
+        StepVerifier.create(categoryService.getCategoryById(999L))
+                .expectErrorMatches(throwable ->
+                        throwable.getMessage().contains("Category not found"))
+                .verify();
+    }
+
+    @Test
+    void createCategory_shouldCreateNewCategory() {
+        CategoryDto request = new CategoryDto(null, "Tablets", parentCategory.getId(), null);
+
+        CategoryDto result = categoryService.createCategory(request).block();
+
+        assertNotNull(result);
+        assertNotNull(result.id());
+        assertEquals("Tablets", result.name());
+        assertEquals(parentCategory.getId(), result.parent_id());
+
+        Category saved = categoryRepository.findById(result.id()).block();
+        assertNotNull(saved);
+        assertEquals("Tablets", saved.getName());
+    }
+
+    @Test
+    void createCategory_shouldThrowWhenDuplicateName() {
+        CategoryDto request = new CategoryDto(null, "Electronics", null, null);
+
+        StepVerifier.create(categoryService.createCategory(request))
+                .expectErrorMatches(throwable ->
+                        throwable.getMessage().contains("Category with this name already exists"))
+                .verify();
+    }
+
+    @Test
+    void createCategory_shouldThrowWhenParentNotFound() {
+        CategoryDto request = new CategoryDto(null, "New Category", 999L, null);
+
+        StepVerifier.create(categoryService.createCategory(request))
+                .expectErrorMatches(throwable ->
+                        throwable.getMessage().contains("Parent category not found"))
+                .verify();
+    }
+
+    @Test
+    void updateCategory_shouldUpdateFields() {
+        CategoryDto request = new CategoryDto(null, "Updated Electronics", null, null);
+
+        CategoryDto result = categoryService.updateCategory(parentCategory.getId(), request).block();
+
+        assertNotNull(result);
+        assertEquals("Updated Electronics", result.name());
+        assertNull(result.parent_id());
+
+        Category updated = categoryRepository.findById(parentCategory.getId()).block();
+        assertNotNull(updated);
+        assertEquals("Updated Electronics", updated.getName());
+    }
+
+    @Test
+    void updateCategory_shouldThrowWhenNotFound() {
+        CategoryDto request = new CategoryDto(null, "Updated", null, null);
+
+        StepVerifier.create(categoryService.updateCategory(999L, request))
+                .expectErrorMatches(throwable ->
+                        throwable.getMessage().contains("Category not found"))
+                .verify();
+    }
+
+    @Test
+    void updateCategory_shouldValidateParent() {
+        CategoryDto request = new CategoryDto(null, "Updated", 999L, null);
+
+        StepVerifier.create(categoryService.updateCategory(parentCategory.getId(), request))
+                .expectErrorMatches(throwable ->
+                        throwable.getMessage().contains("Parent category not found"))
+                .verify();
+    }
+
+    @Test
+    void deleteCategory_shouldDeleteWhenNoChildren() {
+        Category leafCategory = Category.builder()
+                .name("Accessories")
+                .parentId(parentCategory.getId())
+                .build();
+        leafCategory = categoryRepository.save(leafCategory).block();
+
+        assertNotNull(leafCategory);
+        categoryService.deleteCategory(leafCategory.getId()).block();
+
+        Boolean exists = categoryRepository.existsById(leafCategory.getId()).block();
+        assertFalse(exists);
+    }
+
+    @Test
+    void deleteCategory_shouldThrowWhenHasChildren() {
+        StepVerifier.create(categoryService.deleteCategory(parentCategory.getId()))
+                .expectErrorMatches(throwable ->
+                        throwable.getMessage().contains("Cannot delete category with subcategories"))
+                .verify();
+    }
+
+    @Test
+    void deleteCategory_shouldThrowWhenNotFound() {
+        StepVerifier.create(categoryService.deleteCategory(999L))
+                .expectErrorMatches(throwable ->
+                        throwable.getMessage().contains("Category not found"))
+                .verify();
+    }
+
+    @Test
+    void categoryRepository_findRootCategories_shouldWork() {
+        List<Category> roots = categoryRepository.findRootCategories()
+                .collectList()
+                .block();
+
+        assertNotNull(roots);
+        assertEquals(1, roots.size());
+        assertEquals("Electronics", roots.get(0).getName());
+    }
+
+    @Test
+    void categoryRepository_findByParentId_shouldWork() {
+        List<Category> children = categoryRepository.findByParentId(parentCategory.getId())
+                .collectList()
+                .block();
+
+        assertNotNull(children);
+        assertEquals(2, children.size());
+
+        List<String> childNames = children.stream()
+                .map(Category::getName)
+                .toList();
+        assertTrue(childNames.contains("Laptops"));
+        assertTrue(childNames.contains("Phones"));
+    }
+
+    @Test
+    void categoryRepository_existsByNameAndParentId_shouldWork() {
+        Boolean exists = categoryRepository.existsByNameAndParentId("Electronics", null)
+                .block();
+        Boolean notExists = categoryRepository.existsByNameAndParentId("TVs", null)
+                .block();
+
+        assertTrue(exists);
+        assertFalse(notExists);
+    }
+
+    @Test
+    void categoryRepository_saveAndFind_shouldWork() {
+        Category newCategory = Category.builder()
+                .name("Monitors")
+                .parentId(parentCategory.getId())
+                .build();
+
+        Category saved = categoryRepository.save(newCategory).block();
+        Category found = categoryRepository.findById(saved.getId()).block();
+
+        assertNotNull(found);
+        assertEquals("Monitors", found.getName());
+        assertEquals(parentCategory.getId(), found.getParentId());
+    }
+
+    @Test
+    void categoryMapper_toDto_shouldMapBasicFields() {
+        CategoryDto dto = categoryMapper.toDto(parentCategory);
+
+        assertNotNull(dto);
+        assertEquals(parentCategory.getId(), dto.id());
+        assertEquals("Electronics", dto.name());
+        assertNull(dto.parent_id());
+        assertNull(dto.children());
+    }
+
+    @Test
+    void categoryMapper_toDtoWithChildren_shouldMapHierarchy() {
+        List<CategoryDto> children = List.of(
+                new CategoryDto(childCategory1.getId(), "Laptops", parentCategory.getId(), null),
+                new CategoryDto(childCategory2.getId(), "Phones", parentCategory.getId(), null)
+        );
+
+        CategoryDto dto = categoryMapper.toDtoWithChildren(parentCategory, null, children);
+
+        assertNotNull(dto);
+        assertEquals(parentCategory.getId(), dto.id());
+        assertEquals("Electronics", dto.name());
+        assertNull(dto.parent_id());
+        assertNotNull(dto.children());
+        assertEquals(2, dto.children().size());
+        assertEquals("Laptops", dto.children().get(0).name());
+        assertEquals("Phones", dto.children().get(1).name());
+    }
+
+    @Test
+    void completeCategoryFlow_shouldWork() {
+        CategoryDto rootRequest = new CategoryDto(null, "Furniture", null, null);
+        CategoryDto root = categoryService.createCategory(rootRequest).block();
+        assertNotNull(root);
+        assertEquals("Furniture", root.name());
+
+        CategoryDto childRequest = new CategoryDto(null, "Chairs", root.id(), null);
+        CategoryDto child = categoryService.createCategory(childRequest).block();
+        assertNotNull(child);
+        assertEquals("Chairs", child.name());
+        assertEquals(root.id(), child.parent_id());
+
+        CategoryTreeDto tree = categoryService.getCategoryTree().block();
+        assertNotNull(tree);
+        assertEquals(2, tree.categories().size());
+
+        CategoryDto furnitureInTree = tree.categories().stream()
+                .filter(c -> "Furniture".equals(c.name()))
+                .findFirst()
+                .orElseThrow();
+        assertNotNull(furnitureInTree.children());
+        assertEquals(1, furnitureInTree.children().size());
+        assertEquals("Chairs", furnitureInTree.children().get(0).name());
+
+        CategoryDto updateRequest = new CategoryDto(null, "Updated Furniture", null, null);
+        CategoryDto updated = categoryService.updateCategory(root.id(), updateRequest).block();
+        assertEquals("Updated Furniture", updated.name());
+
+        CategoryDto byId = categoryService.getCategoryById(root.id()).block();
+        assertEquals("Updated Furniture", byId.name());
+        assertNotNull(byId.children());
+        assertEquals(1, byId.children().size());
+
+        categoryService.deleteCategory(child.id()).block();
+
+        Boolean childExists = categoryRepository.existsById(child.id()).block();
+        assertFalse(childExists);
+
+        categoryService.deleteCategory(root.id()).block();
+
+        Boolean rootExists = categoryRepository.existsById(root.id()).block();
+        assertFalse(rootExists);
+    }
+
+    @Test
+    void deepHierarchy_shouldBuildCorrectTree() {
+        Category level1 = categoryRepository.save(
+                Category.builder().name("Level1").parentId(null).build()
+        ).block();
+
+        Category level2 = categoryRepository.save(
+                Category.builder().name("Level2").parentId(level1.getId()).build()
+        ).block();
+
+        Category level3 = categoryRepository.save(
+                Category.builder().name("Level3").parentId(level2.getId()).build()
+        ).block();
+
+        CategoryTreeDto tree = categoryService.getCategoryTree().block();
+
+        assertNotNull(tree);
+        assertEquals(2, tree.categories().size());
+
+        CategoryDto level1Dto = tree.categories().stream()
+                .filter(c -> "Level1".equals(c.name()))
+                .findFirst()
+                .orElseThrow();
+
+        assertNotNull(level1Dto.children());
+        assertEquals(1, level1Dto.children().size());
+        assertEquals("Level2", level1Dto.children().get(0).name());
+
+        assertNotNull(level1Dto.children().get(0).children());
+        assertEquals(1, level1Dto.children().get(0).children().size());
+        assertEquals("Level3", level1Dto.children().get(0).children().get(0).name());
+    }
+
+    @Test
+    void pagination_shouldWorkCorrectly() {
+        for (int i = 0; i < 15; i++) {
+            Category category = Category.builder()
+                    .name("Category " + i)
+                    .parentId(null)
+                    .build();
+            categoryRepository.save(category).block();
+        }
+
+        PageResponse<CategoryDto> page1 = categoryService.getAllCategories(
+                PageRequest.of(0, 10)).block();
+
+        PageResponse<CategoryDto> page2 = categoryService.getAllCategories(
+                PageRequest.of(1, 10)).block();
+
+        assertNotNull(page1);
+        assertEquals(10, page1.content().size());
+        assertEquals(0, page1.current_page());
+        assertEquals(10, page1.page_size());
+        assertTrue(page1.has_next());
+        assertFalse(page1.has_previous());
+
+        assertNotNull(page2);
+        assertEquals(8, page2.content().size());
+        assertEquals(1, page2.current_page());
+        assertEquals(10, page2.page_size());
+        assertFalse(page2.has_next());
+        assertTrue(page2.has_previous());
+    }
+}
