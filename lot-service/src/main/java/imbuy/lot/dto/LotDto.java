@@ -1,4 +1,3 @@
-// lot-service/src/main/java/imbuy/lot/dto/LotDto.java
 package imbuy.lot.dto;
 
 import imbuy.lot.enums.LotStatus;

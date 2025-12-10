@@ -1,13 +1,9 @@
 server:
-  port: 8084
+  port: 0
 
 spring:
   application:
     name: lot-service
-  datasource:
-    url: jdbc:postgresql://localhost:5435/lot_db
-    username: imbuy
-    password: secret
   jpa:
     hibernate:
       ddl-auto: validate
@@ -26,30 +22,23 @@ feign:
 
 resilience4j:
   circuitbreaker:
-    configs:
-      default:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 5s
-        failureRateThreshold: 50
-        eventConsumerBufferSize: 10
     instances:
       userServiceClient:
-        baseConfig: default
+        registerHealthIndicator: true
+        slidingWindowSize: 5
+        failureRateThreshold: 50
         waitDurationInOpenState: 10s
-      bidServiceClient:
-        baseConfig: default
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - feign.FeignException
+          - java.io.IOException
+          - java.net.ConnectException
+          - java.util.concurrent.TimeoutException
 
 springdoc:
   api-docs:
     path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
-    enabled: true
-    use-root-path: true
 
 management:
   endpoints:

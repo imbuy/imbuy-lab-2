@@ -5,137 +5,156 @@ import imbuy.lot.domain.Lot;
 import imbuy.lot.dto.*;
 import imbuy.lot.enums.LotStatus;
 import imbuy.lot.repository.LotRepository;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class LotService {
 
     private final UserClient userClient;
     private final LotRepository lotRepository;
 
+    @CircuitBreaker(name = "userServiceClient", fallbackMethod = "getLotsFallback")
     public PageResponse<LotDto> getLots(LotFilterDto filter, Pageable pageable, Long currentUserId) {
-        Page<Lot> lots;
-
-        if (filter != null && hasFilters(filter)) {
-            lots = lotRepository.findByFilters(
-                    filter.title(),
-                    filter.status(),
-                    filter.category_id(),
-                    filter.owner_id(),
-                    pageable
-            );
-        } else if (filter != null && Boolean.TRUE.equals(filter.active_only())) {
-            lots = lotRepository.findByStatus(LotStatus.ACTIVE, pageable);
-        } else {
-            lots = lotRepository.findAll(pageable);
-        }
-
-        return PageResponse.of(lots.map(this::mapToDto));
+        Page<Lot> lots = findLotsByFilter(filter, pageable);
+        return PageResponse.of(lots.map(this::mapToDtoWithUserInfo));
     }
 
+    @CircuitBreaker(name = "userServiceClient", fallbackMethod = "getLotByIdFallback")
     public LotDto getLotById(Long id) {
-        Lot lot = getLotEntityById(id);
-        return mapToDto(lot);
+        Lot lot = findLotById(id);
+        return mapToDtoWithUserInfo(lot);
     }
 
-    public Lot getLotEntityById(Long id) {
-        return lotRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lot not found"));
-    }
-
+    @Transactional
     public LotDto createLot(CreateLotDto createLotDto, Long ownerId) {
-        Lot lot = Lot.builder()
-                .title(createLotDto.title())
-                .description(createLotDto.description())
-                .startPrice(createLotDto.start_price())
-                .currentPrice(createLotDto.start_price())
-                .bidStep(createLotDto.bid_step())
-                .ownerId(ownerId)
-                .categoryId(createLotDto.category_id())
-                .status(LotStatus.PENDING_APPROVAL)
-                .startDate(createLotDto.start_date() != null ? createLotDto.start_date() : LocalDateTime.now())
-                .endDate(createLotDto.end_date())
-                .createdAt(LocalDateTime.now())
-                .build();
+        validateCreateLotRequest(createLotDto);
 
+        validateUserExists(ownerId);
+
+        Lot lot = buildLotFromRequest(createLotDto, ownerId);
         Lot savedLot = lotRepository.save(lot);
-        return mapToDto(savedLot);
+
+        return mapToDtoWithUserInfo(savedLot);
     }
 
+    public PageResponse<LotDto> getLotsFallback(LotFilterDto filter, Pageable pageable, Long currentUserId, Exception e) {
+        log.warn("Circuit Breaker fallback for getLots. Error: {}", e.getMessage());
+        Page<Lot> lots = findLotsByFilter(filter, pageable);
+        return PageResponse.of(lots.map(this::createBasicLotDto));
+    }
+
+    public LotDto getLotByIdFallback(Long id, Exception e) {
+        log.warn("Circuit Breaker fallback for getLotById({}). Error: {}", id, e.getMessage());
+        Lot lot = findLotById(id);
+        return createBasicLotDto(lot);
+    }
+
+    private void validateUserExists(Long userId) {
+        try {
+            UserDto user = userClient.getUserById(userId);
+            if (user == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+            }
+        } catch (Exception e) {
+            log.error("Failed to validate user existence for ID: {}. Error: {}", userId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "User service is unavailable. Cannot create lot without user validation.");
+        }
+    }
+
+    @Transactional
     public LotDto approveLot(Long lotId, Long currentUserId) {
-        Lot lot = getLotEntityById(lotId);
-        checkOwnership(lot, currentUserId);
+        Lot lot = findLotById(lotId);
+        validateOwnership(lot, currentUserId);
+        validateLotStatus(lot, LotStatus.PENDING_APPROVAL, "Lot is not awaiting approval");
 
-        if (lot.getStatus() != LotStatus.PENDING_APPROVAL) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Lot is not awaiting approval");
-        }
-
-        Lot updatedLot = lot.toBuilder()
-                .status(LotStatus.ACTIVE)
-                .build();
-        lotRepository.save(updatedLot);
-
-        return mapToDto(updatedLot);
+        Lot approvedLot = updateLotStatus(lot, LotStatus.ACTIVE);
+        return mapToDtoWithUserInfo(approvedLot);
     }
 
+    @Transactional
     public LotDto cancelLot(Long lotId, Long currentUserId, String reason) {
-        Lot lot = getLotEntityById(lotId);
-        checkOwnership(lot, currentUserId);
+        Lot lot = findLotById(lotId);
+        validateOwnership(lot, currentUserId);
+        validateLotStatus(lot, LotStatus.PENDING_APPROVAL, "Lot cannot be rejected");
 
-        if (lot.getStatus() != LotStatus.PENDING_APPROVAL) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Lot cannot be rejected");
-        }
-
-        Lot updatedLot = lot.toBuilder()
-                .status(LotStatus.CANCELLED)
-                .build();
-        lotRepository.save(updatedLot);
-
-        return mapToDto(updatedLot);
+        Lot cancelledLot = updateLotStatus(lot, LotStatus.CANCELLED);
+        log.info("Lot {} cancelled by user {}. Reason: {}", lotId, currentUserId, reason);
+        return mapToDtoWithUserInfo(cancelledLot);
     }
 
+    @Transactional
     public LotDto updateLot(Long id, UpdateLotDto updateLotDto, Long currentUserId) {
-        Lot lot = getLotEntityById(id);
-        checkOwnership(lot, currentUserId);
+        Lot lot = findLotById(id);
+        validateOwnership(lot, currentUserId);
+        validateUpdatableStatus(lot);
 
-        if (lot.getStatus() != LotStatus.DRAFT && lot.getStatus() != LotStatus.PENDING_APPROVAL) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot update lot in current status");
-        }
-        Lot.LotBuilder lotBuilder = lot.toBuilder();
-        if (updateLotDto.title() != null) lotBuilder.title(updateLotDto.title());
-        if (updateLotDto.description() != null) lotBuilder.description(updateLotDto.description());
-        if (updateLotDto.bid_step() != null) lotBuilder.bidStep(updateLotDto.bid_step());
-        if (updateLotDto.end_date() != null) lotBuilder.endDate(updateLotDto.end_date());
-        if (updateLotDto.category_id() != null) lotBuilder.categoryId(updateLotDto.category_id());
-
-        Lot updatedLot = lotRepository.save(lot);
-        return mapToDto(updatedLot);
+        Lot updatedLot = updateLotFromRequest(lot, updateLotDto);
+        return mapToDtoWithUserInfo(updatedLot);
     }
 
+    @Transactional
     public void deleteLot(Long id, Long currentUserId) {
-        Lot lot = getLotEntityById(id);
-        checkOwnership(lot, currentUserId);
-
-        if (lot.getStatus() == LotStatus.ACTIVE) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot delete active lot");
-        }
+        Lot lot = findLotById(id);
+        validateOwnership(lot, currentUserId);
+        validateDeletableStatus(lot);
 
         lotRepository.delete(lot);
+        log.info("Lot {} deleted by user {}", id, currentUserId);
     }
 
-    private LotDto mapToDto(Lot lot) {
-        UserDto owner = userClient.getUserById(lot.getOwnerId());
-        String ownerName = owner != null ? owner.username() : "Unknown";
+    private LotDto mapToDtoWithUserInfo(Lot lot) {
+        try {
+            UserDto owner = userClient.getUserById(lot.getOwnerId());
+            String ownerName = owner != null ? owner.username() : "Unknown";
 
+            String winnerName = null;
+            if (lot.getWinnerId() != null) {
+                UserDto winner = userClient.getUserById(lot.getWinnerId());
+                winnerName = winner != null ? winner.username() : "Unknown";
+            }
+
+            return createLotDto(lot, ownerName, winnerName);
+        } catch (Exception e) {
+            log.warn("Error fetching user info, using fallback. Error: {}", e.getMessage());
+            return createBasicLotDto(lot);
+        }
+    }
+
+    private LotDto createBasicLotDto(Lot lot) {
+        return new LotDto(
+                lot.getId(),
+                lot.getTitle(),
+                lot.getDescription(),
+                lot.getStartPrice(),
+                lot.getCurrentPrice(),
+                lot.getBidStep(),
+                lot.getOwnerId(),
+                "User Service Unavailable",
+                lot.getCategoryId(),
+                lot.getCategoryId() != null ? "Category " + lot.getCategoryId() : null,
+                lot.getStatus(),
+                lot.getStartDate(),
+                lot.getEndDate(),
+                lot.getWinnerId(),
+                "User Service Unavailable"
+        );
+    }
+
+    private LotDto createLotDto(Lot lot, String ownerName, String winnerName) {
         return new LotDto(
                 lot.getId(),
                 lot.getTitle(),
@@ -151,18 +170,97 @@ public class LotService {
                 lot.getStartDate(),
                 lot.getEndDate(),
                 lot.getWinnerId(),
-                lot.getWinnerId() != null ? "Winner " + lot.getWinnerId() : null
+                winnerName
         );
+    }
+
+    private Lot findLotById(Long id) {
+        return lotRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lot not found"));
+    }
+
+    private Page<Lot> findLotsByFilter(LotFilterDto filter, Pageable pageable) {
+        if (filter != null && hasFilters(filter)) {
+            return lotRepository.findByFilters(
+                    filter.title(),
+                    filter.status(),
+                    filter.category_id(),
+                    filter.owner_id(),
+                    pageable
+            );
+        } else if (filter != null && Boolean.TRUE.equals(filter.active_only())) {
+            return lotRepository.findByStatus(LotStatus.ACTIVE, pageable);
+        } else {
+            return lotRepository.findAll(pageable);
+        }
+    }
+
+    private Lot buildLotFromRequest(CreateLotDto createLotDto, Long ownerId) {
+        return Lot.builder()
+                .title(createLotDto.title())
+                .description(createLotDto.description())
+                .startPrice(createLotDto.start_price())
+                .currentPrice(createLotDto.start_price())
+                .bidStep(createLotDto.bid_step())
+                .ownerId(ownerId)
+                .categoryId(createLotDto.category_id())
+                .status(LotStatus.PENDING_APPROVAL)
+                .startDate(createLotDto.start_date() != null ? createLotDto.start_date() : LocalDateTime.now())
+                .endDate(createLotDto.end_date())
+                .createdAt(LocalDateTime.now())
+                .build();
+    }
+
+    private Lot updateLotFromRequest(Lot lot, UpdateLotDto updateLotDto) {
+        Lot.LotBuilder lotBuilder = lot.toBuilder();
+        if (updateLotDto.title() != null) lotBuilder.title(updateLotDto.title());
+        if (updateLotDto.description() != null) lotBuilder.description(updateLotDto.description());
+        if (updateLotDto.bid_step() != null) lotBuilder.bidStep(updateLotDto.bid_step());
+        if (updateLotDto.end_date() != null) lotBuilder.endDate(updateLotDto.end_date());
+        if (updateLotDto.category_id() != null) lotBuilder.categoryId(updateLotDto.category_id());
+
+        return lotRepository.save(lotBuilder.build());
+    }
+
+    private Lot updateLotStatus(Lot lot, LotStatus newStatus) {
+        Lot updatedLot = lot.toBuilder()
+                .status(newStatus)
+                .build();
+        return lotRepository.save(updatedLot);
+    }
+
+    private void validateCreateLotRequest(CreateLotDto createLotDto) {
+        if (createLotDto.end_date() != null && createLotDto.end_date().isBefore(LocalDateTime.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End date cannot be in the past");
+        }
+    }
+
+    private void validateOwnership(Lot lot, Long userId) {
+        if (!lot.getOwnerId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only modify your own lots");
+        }
+    }
+
+    private void validateLotStatus(Lot lot, LotStatus expectedStatus, String errorMessage) {
+        if (lot.getStatus() != expectedStatus) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errorMessage);
+        }
+    }
+
+    private void validateUpdatableStatus(Lot lot) {
+        if (lot.getStatus() != LotStatus.DRAFT && lot.getStatus() != LotStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot update lot in current status");
+        }
+    }
+
+    private void validateDeletableStatus(Lot lot) {
+        if (lot.getStatus() == LotStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot delete active lot");
+        }
     }
 
     private boolean hasFilters(LotFilterDto filter) {
         return filter.title() != null || filter.status() != null ||
                 filter.category_id() != null || filter.owner_id() != null;
-    }
-
-    private void checkOwnership(Lot lot, Long userId) {
-        if (!lot.getOwnerId().equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only modify your own lots");
-        }
     }
 }

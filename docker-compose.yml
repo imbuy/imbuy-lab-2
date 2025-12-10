@@ -128,10 +128,8 @@ services:
       context: .
       dockerfile: user-service/Dockerfile
     container_name: user-service
-    ports:
-      - "8082:8082"
     environment:
-      - SERVER_PORT=8082
+      - SERVER_PORT=0
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-user:5432/user_db
       - SPRING_DATASOURCE_USERNAME=imbuy
       - SPRING_DATASOURCE_PASSWORD=secret
@@ -148,7 +146,7 @@ services:
     networks:
       - imbuy-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -159,10 +157,8 @@ services:
       context: .
       dockerfile: category-service/Dockerfile
     container_name: category-service
-    ports:
-      - "8081:8081"
     environment:
-      - SERVER_PORT=8081
+      - SERVER_PORT=0
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-category:5432/category_db
       - SPRING_DATASOURCE_USERNAME=imbuy
       - SPRING_DATASOURCE_PASSWORD=secret
@@ -182,7 +178,7 @@ services:
     networks:
       - imbuy-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -193,10 +189,8 @@ services:
       context: .
       dockerfile: lot-service/Dockerfile
     container_name: lot-service
-    ports:
-      - "8084:8084"
     environment:
-      - SERVER_PORT=8084
+      - SERVER_PORT=0
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-lot:5432/lot_db
       - SPRING_DATASOURCE_USERNAME=imbuy
       - SPRING_DATASOURCE_PASSWORD=secret
@@ -215,7 +209,7 @@ services:
     networks:
       - imbuy-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8084/actuator/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -225,10 +219,8 @@ services:
       context: .
       dockerfile: bid-service/Dockerfile
     container_name: bid-service
-    ports:
-      - "8085:8085"
     environment:
-      - SERVER_PORT=8085
+      - SERVER_PORT=0
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-bid:5432/bid_db
       - SPRING_DATASOURCE_USERNAME=imbuy
       - SPRING_DATASOURCE_PASSWORD=secret
@@ -248,7 +240,7 @@ services:
     networks:
       - imbuy-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8085/actuator/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3

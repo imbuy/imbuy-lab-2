@@ -1,8 +1,6 @@
 package imbuy.category.controller;
 
-import imbuy.category.dto.CategoryDto;
-import imbuy.category.dto.CategoryTreeDto;
-import imbuy.category.dto.PageResponse;
+import imbuy.category.dto.*;
 import imbuy.category.service.CategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,7 +28,7 @@ public class CategoryController {
 
     @GetMapping
     @Operation(summary = "Get all categories with pagination")
-    public Mono<PageResponse<CategoryDto>> getAllCategoriesPaginated(
+    public Mono<PageResponse<CategoryResponse>> getAllCategoriesPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
@@ -40,23 +38,23 @@ public class CategoryController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get category by ID")
-    public Mono<CategoryDto> getCategoryById(@PathVariable Long id) {
+    public Mono<CategoryResponse> getCategoryById(@PathVariable Long id) {
         return categoryService.getCategoryById(id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a new category")
-    public Mono<CategoryDto> createCategory(@Valid @RequestBody CategoryDto categoryDto) {
-        return categoryService.createCategory(categoryDto);
+    public Mono<CategoryResponse> createCategory(@Valid @RequestBody CategoryRequest categoryRequest) {
+        return categoryService.createCategory(categoryRequest);
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Update category")
-    public Mono<CategoryDto> updateCategory(
+    public Mono<CategoryResponse> updateCategory(
             @PathVariable Long id,
-            @Valid @RequestBody CategoryDto categoryDto) {
-        return categoryService.updateCategory(id, categoryDto);
+            @Valid @RequestBody CategoryRequest categoryRequest) {
+        return categoryService.updateCategory(id, categoryRequest);
     }
 
     @DeleteMapping("/{id}")
