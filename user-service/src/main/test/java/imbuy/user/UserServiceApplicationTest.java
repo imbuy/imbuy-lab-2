@@ -32,11 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @Testcontainers
 @TestPropertySource(properties = {
         "spring.cloud.config.enabled=false",
-        "eureka.client.enabled=false",
-        "spring.flyway.enabled=true",
-        "spring.datasource.url=jdbc:postgresql://localhost:${testcontainers.postgresql.port}/user_test",
-        "spring.datasource.username=test",
-        "spring.datasource.password=test"
+        "eureka.client.enabled=false"
 })
 class UserServiceApplicationTest {
 
@@ -45,13 +41,8 @@ class UserServiceApplicationTest {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
             .withDatabaseName("user_test")
             .withUsername("test")
-            .withPassword("test")
-            .withReuse(true);
+            .withPassword("test");
 
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("testcontainers.postgresql.port", postgres::getFirstMappedPort);
-    }
 
     @Autowired
     private UserService userService;
