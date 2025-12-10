@@ -29,8 +29,22 @@ public class BidService {
     }
 
     public Mono<BidDto> placeBid(Long lotId, CreateBidDto createBidDto, Long currentUserId) {
-        return validateBid(lotId, createBidDto.amount(), currentUserId)
-                .then(createBid(lotId, createBidDto.amount(), currentUserId))
+        BigDecimal amount = createBidDto.amount();
+
+        if (amount == null) {
+            return Mono.error(new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Bid amount is required"
+            ));
+        }
+
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return Mono.error(new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Bid amount must be greater than zero"
+            ));
+        }
+
+        return validateBid(lotId, amount, currentUserId)
+                .then(createBid(lotId, amount, currentUserId))
                 .flatMap(bidRepository::save)
                 .map(bidMapper::mapToDto);
     }
@@ -41,8 +55,10 @@ public class BidService {
                     if (maxBid != null) {
                         BigDecimal minBid = maxBid.add(new BigDecimal("10.00"));
                         if (amount.compareTo(minBid) < 0) {
-                            return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                    String.format("Bid must be at least %.2f", minBid)));
+                            return Mono.error(new ResponseStatusException(
+                                    HttpStatus.BAD_REQUEST,
+                                    String.format("Bid must be at least %.2f", minBid)
+                            ));
                         }
                     }
                     return Mono.empty();
@@ -58,6 +74,7 @@ public class BidService {
                 .amount(amount)
                 .createdAt(LocalDateTime.now())
                 .build();
+
         return Mono.just(bid);
     }
 
@@ -65,27 +82,35 @@ public class BidService {
         return bidRepository.countBidsForLot(lotId)
                 .doOnNext(count -> System.out.println("Total bids in DB for lot " + lotId + ": " + count))
                 .flatMap(count -> {
-                    if (count > 0) {
-                        return bidRepository.findHighestBidByLotId(lotId)
-                                .doOnNext(bid -> {
-                                    System.out.println("=== FOUND BID FROM DB ===");
-                                    System.out.println("Bid ID: " + bid.getId());
-                                    System.out.println("Bidder ID: " + bid.getBidderId());
-                                    System.out.println("Amount: " + bid.getAmount());
-                                    System.out.println("Lot ID: " + bid.getLotId());
-                                    System.out.println("Created At: " + bid.getCreatedAt());
-                                    System.out.println("==========================");
-                                })
-                                .map(Bid::getBidderId)
-                                .doOnNext(winnerId -> System.out.println("Mapped winner ID: " + winnerId));
-                    } else {
+                    if (count == 0) {
                         return Mono.just(0L);
                     }
+
+                    return bidRepository.findHighestBidByLotId(lotId)
+                            .switchIfEmpty(Mono.error(new ResponseStatusException(
+                                    HttpStatus.NOT_FOUND, "No highest bid found"
+                            )))
+                            .doOnNext(bid -> {
+                                System.out.println("=== FOUND BID FROM DB ===");
+                                System.out.println("Bid ID: " + bid.getId());
+                                System.out.println("Bidder ID: " + bid.getBidderId());
+                                System.out.println("Amount: " + bid.getAmount());
+                                System.out.println("Lot ID: " + bid.getLotId());
+                                System.out.println("Created At: " + bid.getCreatedAt());
+                                System.out.println("==========================");
+                            })
+                            .map(Bid::getBidderId)
+                            .doOnNext(winnerId ->
+                                    System.out.println("Mapped winner ID: " + winnerId)
+                            );
                 })
-                .doOnError(error -> {
-                    System.out.println("ERROR: " + error.getMessage());
+                .onErrorResume(e -> {
+                    System.out.println("ERROR: " + e.getMessage());
+                    return Mono.just(0L); // fallback: no winner found
                 })
                 .defaultIfEmpty(0L)
-                .doOnNext(finalResult -> System.out.println("FINAL RESULT: " + finalResult));
+                .doOnNext(finalResult ->
+                        System.out.println("FINAL RESULT: " + finalResult)
+                );
     }
 }
