@@ -1,9 +1,7 @@
 package imbuy.category;
 
 import imbuy.category.domain.Category;
-import imbuy.category.dto.CategoryDto;
-import imbuy.category.dto.CategoryTreeDto;
-import imbuy.category.dto.PageResponse;
+import imbuy.category.dto.*;
 import imbuy.category.mapper.CategoryMapper;
 import imbuy.category.repository.CategoryRepository;
 import imbuy.category.service.CategoryService;
@@ -87,14 +85,14 @@ class CategoryServiceApplicationTest {
         assertNotNull(tree.categories());
         assertEquals(1, tree.categories().size());
 
-        CategoryDto root = tree.categories().get(0);
+        CategoryTreeDto.CategoryNode root = tree.categories().get(0);
         assertEquals("Electronics", root.name());
-        assertNull(root.parent_id());
+        assertNull(root.parentId());
         assertNotNull(root.children());
         assertEquals(2, root.children().size());
 
         List<String> childNames = root.children().stream()
-                .map(CategoryDto::name)
+                .map(CategoryTreeDto.CategoryNode::name)
                 .toList();
         assertTrue(childNames.contains("Laptops"));
         assertTrue(childNames.contains("Phones"));
@@ -102,24 +100,24 @@ class CategoryServiceApplicationTest {
 
     @Test
     void getAllCategories_shouldReturnPaginated() {
-        PageResponse<CategoryDto> result = categoryService.getAllCategories(
+        PageResponse<CategoryResponse> result = categoryService.getAllCategories(
                 PageRequest.of(0, 10)).block();
 
         assertNotNull(result);
         assertEquals(3, result.content().size());
-        assertEquals(0, result.current_page());
-        assertEquals(10, result.page_size());
-        assertFalse(result.has_next());
-        assertFalse(result.has_previous());
+        assertEquals(0, result.page());
+        assertEquals(10, result.size());
+        assertFalse(result.hasNext());
+        assertFalse(result.hasPrevious());
     }
 
     @Test
     void getCategoryById_shouldReturnWithChildren() {
-        CategoryDto result = categoryService.getCategoryById(parentCategory.getId()).block();
+        CategoryResponse result = categoryService.getCategoryById(parentCategory.getId()).block();
 
         assertNotNull(result);
         assertEquals("Electronics", result.name());
-        assertNull(result.parent_id());
+        assertNull(result.parentId());
         assertNotNull(result.children());
         assertEquals(2, result.children().size());
     }
@@ -134,14 +132,14 @@ class CategoryServiceApplicationTest {
 
     @Test
     void createCategory_shouldCreateNewCategory() {
-        CategoryDto request = new CategoryDto(null, "Tablets", parentCategory.getId(), null);
+        CategoryRequest request = new CategoryRequest("Tablets", parentCategory.getId());
 
-        CategoryDto result = categoryService.createCategory(request).block();
+        CategoryResponse result = categoryService.createCategory(request).block();
 
         assertNotNull(result);
         assertNotNull(result.id());
         assertEquals("Tablets", result.name());
-        assertEquals(parentCategory.getId(), result.parent_id());
+        assertEquals(parentCategory.getId(), result.parentId());
 
         Category saved = categoryRepository.findById(result.id()).block();
         assertNotNull(saved);
@@ -150,7 +148,7 @@ class CategoryServiceApplicationTest {
 
     @Test
     void createCategory_shouldThrowWhenDuplicateName() {
-        CategoryDto request = new CategoryDto(null, "Electronics", null, null);
+        CategoryRequest request = new CategoryRequest("Electronics", null);
 
         StepVerifier.create(categoryService.createCategory(request))
                 .expectErrorMatches(throwable ->
@@ -160,7 +158,7 @@ class CategoryServiceApplicationTest {
 
     @Test
     void createCategory_shouldThrowWhenParentNotFound() {
-        CategoryDto request = new CategoryDto(null, "New Category", 999L, null);
+        CategoryRequest request = new CategoryRequest("New Category", 999L);
 
         StepVerifier.create(categoryService.createCategory(request))
                 .expectErrorMatches(throwable ->
@@ -170,13 +168,13 @@ class CategoryServiceApplicationTest {
 
     @Test
     void updateCategory_shouldUpdateFields() {
-        CategoryDto request = new CategoryDto(null, "Updated Electronics", null, null);
+        CategoryRequest request = new CategoryRequest("Updated Electronics", null);
 
-        CategoryDto result = categoryService.updateCategory(parentCategory.getId(), request).block();
+        CategoryResponse result = categoryService.updateCategory(parentCategory.getId(), request).block();
 
         assertNotNull(result);
         assertEquals("Updated Electronics", result.name());
-        assertNull(result.parent_id());
+        assertNull(result.parentId());
 
         Category updated = categoryRepository.findById(parentCategory.getId()).block();
         assertNotNull(updated);
@@ -185,7 +183,7 @@ class CategoryServiceApplicationTest {
 
     @Test
     void updateCategory_shouldThrowWhenNotFound() {
-        CategoryDto request = new CategoryDto(null, "Updated", null, null);
+        CategoryRequest request = new CategoryRequest("Updated", null);
 
         StepVerifier.create(categoryService.updateCategory(999L, request))
                 .expectErrorMatches(throwable ->
@@ -195,7 +193,7 @@ class CategoryServiceApplicationTest {
 
     @Test
     void updateCategory_shouldValidateParent() {
-        CategoryDto request = new CategoryDto(null, "Updated", 999L, null);
+        CategoryRequest request = new CategoryRequest("Updated", 999L);
 
         StepVerifier.create(categoryService.updateCategory(parentCategory.getId(), request))
                 .expectErrorMatches(throwable ->
@@ -288,53 +286,64 @@ class CategoryServiceApplicationTest {
     }
 
     @Test
-    void categoryMapper_toDto_shouldMapBasicFields() {
-        CategoryDto dto = categoryMapper.toDto(parentCategory);
+    void categoryMapper_toEntity_shouldMapRequest() {
+        CategoryRequest request = new CategoryRequest("Test", parentCategory.getId());
+        Category entity = categoryMapper.toEntity(request);
 
-        assertNotNull(dto);
-        assertEquals(parentCategory.getId(), dto.id());
-        assertEquals("Electronics", dto.name());
-        assertNull(dto.parent_id());
-        assertNull(dto.children());
+        assertNotNull(entity);
+        assertNull(entity.getId());
+        assertEquals("Test", entity.getName());
+        assertEquals(parentCategory.getId(), entity.getParentId());
     }
 
     @Test
-    void categoryMapper_toDtoWithChildren_shouldMapHierarchy() {
-        List<CategoryDto> children = List.of(
-                new CategoryDto(childCategory1.getId(), "Laptops", parentCategory.getId(), null),
-                new CategoryDto(childCategory2.getId(), "Phones", parentCategory.getId(), null)
+    void categoryMapper_toResponse_shouldMapBasicFields() {
+        CategoryResponse response = categoryMapper.toResponse(parentCategory);
+
+        assertNotNull(response);
+        assertEquals(parentCategory.getId(), response.id());
+        assertEquals("Electronics", response.name());
+        assertNull(response.parentId());
+        assertNull(response.children());
+    }
+
+    @Test
+    void categoryMapper_toResponseWithChildren_shouldMapHierarchy() {
+        List<CategoryResponse> children = List.of(
+                new CategoryResponse(childCategory1.getId(), "Laptops", parentCategory.getId(), null),
+                new CategoryResponse(childCategory2.getId(), "Phones", parentCategory.getId(), null)
         );
 
-        CategoryDto dto = categoryMapper.toDtoWithChildren(parentCategory, null, children);
+        CategoryResponse response = categoryMapper.toResponseWithChildren(parentCategory, children);
 
-        assertNotNull(dto);
-        assertEquals(parentCategory.getId(), dto.id());
-        assertEquals("Electronics", dto.name());
-        assertNull(dto.parent_id());
-        assertNotNull(dto.children());
-        assertEquals(2, dto.children().size());
-        assertEquals("Laptops", dto.children().get(0).name());
-        assertEquals("Phones", dto.children().get(1).name());
+        assertNotNull(response);
+        assertEquals(parentCategory.getId(), response.id());
+        assertEquals("Electronics", response.name());
+        assertNull(response.parentId());
+        assertNotNull(response.children());
+        assertEquals(2, response.children().size());
+        assertEquals("Laptops", response.children().get(0).name());
+        assertEquals("Phones", response.children().get(1).name());
     }
 
     @Test
     void completeCategoryFlow_shouldWork() {
-        CategoryDto rootRequest = new CategoryDto(null, "Furniture", null, null);
-        CategoryDto root = categoryService.createCategory(rootRequest).block();
+        CategoryRequest rootRequest = new CategoryRequest("Furniture", null);
+        CategoryResponse root = categoryService.createCategory(rootRequest).block();
         assertNotNull(root);
         assertEquals("Furniture", root.name());
 
-        CategoryDto childRequest = new CategoryDto(null, "Chairs", root.id(), null);
-        CategoryDto child = categoryService.createCategory(childRequest).block();
+        CategoryRequest childRequest = new CategoryRequest("Chairs", root.id());
+        CategoryResponse child = categoryService.createCategory(childRequest).block();
         assertNotNull(child);
         assertEquals("Chairs", child.name());
-        assertEquals(root.id(), child.parent_id());
+        assertEquals(root.id(), child.parentId());
 
         CategoryTreeDto tree = categoryService.getCategoryTree().block();
         assertNotNull(tree);
         assertEquals(2, tree.categories().size());
 
-        CategoryDto furnitureInTree = tree.categories().stream()
+        CategoryTreeDto.CategoryNode furnitureInTree = tree.categories().stream()
                 .filter(c -> "Furniture".equals(c.name()))
                 .findFirst()
                 .orElseThrow();
@@ -342,11 +351,11 @@ class CategoryServiceApplicationTest {
         assertEquals(1, furnitureInTree.children().size());
         assertEquals("Chairs", furnitureInTree.children().get(0).name());
 
-        CategoryDto updateRequest = new CategoryDto(null, "Updated Furniture", null, null);
-        CategoryDto updated = categoryService.updateCategory(root.id(), updateRequest).block();
+        CategoryRequest updateRequest = new CategoryRequest("Updated Furniture", null);
+        CategoryResponse updated = categoryService.updateCategory(root.id(), updateRequest).block();
         assertEquals("Updated Furniture", updated.name());
 
-        CategoryDto byId = categoryService.getCategoryById(root.id()).block();
+        CategoryResponse byId = categoryService.getCategoryById(root.id()).block();
         assertEquals("Updated Furniture", byId.name());
         assertNotNull(byId.children());
         assertEquals(1, byId.children().size());
@@ -381,7 +390,7 @@ class CategoryServiceApplicationTest {
         assertNotNull(tree);
         assertEquals(2, tree.categories().size());
 
-        CategoryDto level1Dto = tree.categories().stream()
+        CategoryTreeDto.CategoryNode level1Dto = tree.categories().stream()
                 .filter(c -> "Level1".equals(c.name()))
                 .findFirst()
                 .orElseThrow();
@@ -405,24 +414,35 @@ class CategoryServiceApplicationTest {
             categoryRepository.save(category).block();
         }
 
-        PageResponse<CategoryDto> page1 = categoryService.getAllCategories(
+        PageResponse<CategoryResponse> page1 = categoryService.getAllCategories(
                 PageRequest.of(0, 10)).block();
 
-        PageResponse<CategoryDto> page2 = categoryService.getAllCategories(
+        PageResponse<CategoryResponse> page2 = categoryService.getAllCategories(
                 PageRequest.of(1, 10)).block();
 
         assertNotNull(page1);
         assertEquals(10, page1.content().size());
-        assertEquals(0, page1.current_page());
-        assertEquals(10, page1.page_size());
-        assertTrue(page1.has_next());
-        assertFalse(page1.has_previous());
+        assertEquals(0, page1.page());
+        assertEquals(10, page1.size());
+        assertTrue(page1.hasNext());
+        assertFalse(page1.hasPrevious());
 
         assertNotNull(page2);
-        assertEquals(8, page2.content().size());
-        assertEquals(1, page2.current_page());
-        assertEquals(10, page2.page_size());
-        assertFalse(page2.has_next());
-        assertTrue(page2.has_previous());
+        assertEquals(8, page2.content().size()); // 3 оригинальные + 15 новых = 18, на второй странице 8
+        assertEquals(1, page2.page());
+        assertEquals(10, page2.size());
+        assertFalse(page2.hasNext());
+        assertTrue(page2.hasPrevious());
+    }
+
+    @Test
+    void updateEntity_shouldUpdateFields() {
+        Category existingCategory = parentCategory;
+        CategoryRequest request = new CategoryRequest("Updated Name", 999L);
+
+        categoryMapper.updateEntity(request, existingCategory);
+
+        assertEquals("Updated Name", existingCategory.getName());
+        assertEquals(999L, existingCategory.getParentId());
     }
 }

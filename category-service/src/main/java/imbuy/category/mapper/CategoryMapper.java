@@ -12,26 +12,22 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface CategoryMapper {
 
-    // Map для создания из Request
-    @Mapping(target = "id", ignore = true)  // Игнорируем id при создании
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "name", source = "name")
     @Mapping(target = "parentId", source = "parentId")
     Category toEntity(CategoryRequest request);
 
-    // Map для обновления
-    @Mapping(target = "id", ignore = true)  // Игнорируем id
+    @Mapping(target = "id", ignore = true)
     @Mapping(target = "name", source = "name")
     @Mapping(target = "parentId", source = "parentId")
     Category updateEntity(CategoryRequest request, @MappingTarget Category category);
 
-    // Map для Response
     @Mapping(target = "id", source = "id")
     @Mapping(target = "name", source = "name")
     @Mapping(target = "parentId", source = "parentId")
-    @Mapping(target = "children", ignore = true)  // Обрабатывается отдельно
+    @Mapping(target = "children", ignore = true)
     CategoryResponse toResponse(Category category);
 
-    // Map для Response с детьми
     @Mapping(target = "id", source = "category.id")
     @Mapping(target = "name", source = "category.name")
     @Mapping(target = "parentId", source = "category.parentId")
