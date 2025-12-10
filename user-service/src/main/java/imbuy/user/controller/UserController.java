@@ -1,6 +1,5 @@
 package imbuy.user.controller;
 
-import imbuy.user.dto.PageResponse;
 import imbuy.user.dto.RegisterRequest;
 import imbuy.user.dto.UserDto;
 import imbuy.user.service.UserService;
@@ -12,12 +11,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
-@Tag(name = "Users", description = "User management APIs")
+@Tag(name = "User Management", description = "APIs for managing users")
 public class UserController {
 
     private final UserService userService;
@@ -30,8 +30,8 @@ public class UserController {
     }
 
     @GetMapping
-    @Operation(summary = "Get all users with pagination")
-    public Mono<PageResponse<UserDto>> getAllUsers(
+    @Operation(summary = "Get paginated list of users")
+    public Flux<UserDto> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 

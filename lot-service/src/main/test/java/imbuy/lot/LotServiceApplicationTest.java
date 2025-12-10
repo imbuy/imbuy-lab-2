@@ -27,6 +27,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
@@ -114,23 +115,55 @@ class LotServiceApplicationTest {
     void getLots_shouldReturnFilteredResults() {
         LotFilterDto filter = new LotFilterDto(null, null, null, null, false);
 
-        PageResponse<LotDto> result = lotService.getLots(filter,
+        List<LotDto> result = lotService.getLots(filter,
                 PageRequest.of(0, 10), testOwnerId);
 
         assertNotNull(result);
-        assertEquals(1, result.content().size());
-        assertEquals("Test Laptop", result.content().get(0).title());
-        assertEquals("testuser", result.content().get(0).owner_username());
+        assertEquals(1, result.size());
+        assertEquals("Test Laptop", result.get(0).title());
+        assertEquals("testuser", result.get(0).owner_username());
     }
 
     @Test
     void getLots_withTitleFilter_shouldWork() {
         LotFilterDto filter = new LotFilterDto("Laptop", null, null, null, false);
 
-        PageResponse<LotDto> result = lotService.getLots(filter,
+        List<LotDto> result = lotService.getLots(filter,
                 PageRequest.of(0, 10), testOwnerId);
 
-        assertEquals(1, result.content().size());
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void getLots_shouldReturnPaginated() {
+        for (int i = 0; i < 15; i++) {
+            Lot lot = Lot.builder()
+                    .title("Lot " + i)
+                    .description("Description " + i)
+                    .startPrice(new BigDecimal("100.00"))
+                    .currentPrice(new BigDecimal("100.00"))
+                    .bidStep(new BigDecimal("10.00"))
+                    .ownerId(testOwnerId)
+                    .status(LotStatus.ACTIVE)
+                    .startDate(LocalDateTime.now())
+                    .endDate(LocalDateTime.now().plusDays(7))
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            lotRepository.save(lot);
+        }
+
+        List<LotDto> page1 = lotService.getLots(
+                new LotFilterDto(null, null, null, null, false),
+                PageRequest.of(0, 10), testOwnerId);
+
+        List<LotDto> page2 = lotService.getLots(
+                new LotFilterDto(null, null, null, null, false),
+                PageRequest.of(1, 10), testOwnerId);
+
+        assertNotNull(page1);
+        assertNotNull(page2);
+        assertEquals(10, page1.size());
+        assertEquals(6, page2.size());
     }
 
     @Test
@@ -285,12 +318,12 @@ class LotServiceApplicationTest {
 
         LotFilterDto filter = new LotFilterDto(null, null, null, null, false);
 
-        PageResponse<LotDto> result = lotService.getLots(filter,
+        List<LotDto> result = lotService.getLots(filter,
                 PageRequest.of(0, 10), testOwnerId);
 
         assertNotNull(result);
-        assertEquals(1, result.content().size());
-        assertEquals("User Service Unavailable", result.content().get(0).owner_username());
+        assertEquals(1, result.size());
+        assertEquals("User Service Unavailable", result.get(0).owner_username());
     }
 
     @Test

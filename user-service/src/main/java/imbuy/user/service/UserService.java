@@ -1,21 +1,21 @@
 package imbuy.user.service;
 
 import imbuy.user.domain.User;
-import imbuy.user.dto.PageResponse;
 import imbuy.user.dto.RegisterRequest;
 import imbuy.user.dto.UserDto;
 import imbuy.user.mapper.UserMapper;
 import imbuy.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.math.BigDecimal;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -28,30 +28,26 @@ public class UserService {
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(exists -> {
                     if (exists) {
-                        return Mono.error(new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists"));
+                        return Mono.error(new ResponseStatusException(
+                                HttpStatus.CONFLICT, "Email already exists"));
                     }
+
                     User user = User.builder()
                             .email(request.email())
                             .password(request.password())
                             .username(request.username())
                             .build();
 
-                    return Mono.fromCallable(() -> userRepository.save(user))
-                            .subscribeOn(Schedulers.boundedElastic())
-                            .map(userMapper::mapToDto);
-                });
+                    return saveUser(user);
+                })
+                .doOnSuccess(user -> log.info("User registered: id={}, email={}",
+                        user.id(), user.email()));
     }
 
     public Mono<UserDto> updateProfile(Long userId, RegisterRequest request) {
-        return Mono.fromCallable(() -> userRepository.findById(userId))
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(userOpt -> {
-                    if (userOpt.isEmpty()) {
-                        return Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-                    }
-
-                    User user = userOpt.get();
-                    User.UserBuilder userBuilder = user.toBuilder()
+        return findUserById(userId)
+                .flatMap(existingUser -> {
+                    User.UserBuilder userBuilder = existingUser.toBuilder()
                             .username(request.username());
 
                     if (request.password() != null && !request.password().isEmpty()) {
@@ -59,22 +55,35 @@ public class UserService {
                     }
 
                     User updatedUser = userBuilder.build();
-
-                    return Mono.fromCallable(() -> userRepository.save(updatedUser))
-                            .subscribeOn(Schedulers.boundedElastic())
-                            .map(userMapper::mapToDto);
-                });
+                    return saveUser(updatedUser);
+                })
+                .doOnSuccess(user -> log.info("User profile updated: id={}", user.id()));
     }
 
-    public Mono<PageResponse<UserDto>> findAllUsers(Pageable pageable) {
+    public Flux<UserDto> findAllUsers(Pageable pageable) {
         return Mono.fromCallable(() -> userRepository.findAll(pageable))
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(page -> PageResponse.of(page.map(userMapper::mapToDto)));
+                .flatMapIterable(page -> page.getContent())
+                .map(userMapper::mapToDto);
     }
 
     public Mono<UserDto> findById(Long id) {
+        return findUserById(id)
+                .map(userMapper::mapToDto)
+                .switchIfEmpty(Mono.error(new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "User not found")));
+    }
+
+    private Mono<User> findUserById(Long id) {
         return Mono.fromCallable(() -> userRepository.findById(id))
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(userOpt -> userOpt.map(user -> Mono.just(userMapper.mapToDto(user))).orElseGet(() -> Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"))));
+                .flatMap(optional -> optional.map(Mono::just)
+                        .orElse(Mono.empty()));
+    }
+
+    private Mono<UserDto> saveUser(User user) {
+        return Mono.fromCallable(() -> userRepository.save(user))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(userMapper::mapToDto);
     }
 }

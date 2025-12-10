@@ -13,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/lots")
 @RequiredArgsConstructor
@@ -23,7 +25,7 @@ public class LotController {
 
     @GetMapping
     @Operation(summary = "Get all lots with pagination and filtering")
-    public ResponseEntity<PageResponse<LotDto>> getLots(
+    public ResponseEntity<List<LotDto>> getLots(
             @RequestParam(required = false) String title,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long categoryId,
@@ -50,7 +52,7 @@ public class LotController {
         );
 
         Pageable pageable = PageRequest.of(page, Math.min(size, 50));
-        PageResponse<LotDto> lots = lotService.getLots(filter, pageable, ownerId);
+        List<LotDto> lots = lotService.getLots(filter, pageable, ownerId);
         return ResponseEntity.ok(lots);
     }
 
