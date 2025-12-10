@@ -10,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
@@ -28,7 +29,7 @@ public class CategoryController {
 
     @GetMapping
     @Operation(summary = "Get all categories with pagination")
-    public Mono<PageResponse<CategoryResponse>> getAllCategoriesPaginated(
+    public Flux<CategoryResponse> getAllCategoriesPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
