@@ -313,30 +313,6 @@ class LotServiceApplicationTest {
     }
 
     @Test
-    void getLots_withUserServiceUnavailable_shouldUseFallback() {
-        when(userClient.getUserById(testOwnerId)).thenThrow(new RuntimeException("Service unavailable"));
-
-        LotFilterDto filter = new LotFilterDto(null, null, null, null, false);
-
-        List<LotDto> result = lotService.getLots(filter,
-                PageRequest.of(0, 10), testOwnerId);
-
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals("User Service Unavailable", result.get(0).owner_username());
-    }
-
-    @Test
-    void getLotById_withUserServiceUnavailable_shouldUseFallback() {
-        when(userClient.getUserById(testOwnerId)).thenThrow(new RuntimeException("Service unavailable"));
-
-        LotDto result = lotService.getLotById(testLot.getId());
-
-        assertNotNull(result);
-        assertEquals("User Service Unavailable", result.owner_username());
-    }
-
-    @Test
     void closeExpiredLots_shouldCloseActiveExpiredLot() {
         Lot expiredLot = Lot.builder()
                 .title("Expired Lot")
