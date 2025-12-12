@@ -44,22 +44,6 @@ public class UserService {
                         user.id(), user.email()));
     }
 
-    public Mono<UserDto> updateProfile(Long userId, RegisterRequest request) {
-        return findUserById(userId)
-                .flatMap(existingUser -> {
-                    User.UserBuilder userBuilder = existingUser.toBuilder()
-                            .username(request.username());
-
-                    if (request.password() != null && !request.password().isEmpty()) {
-                        userBuilder.password(request.password());
-                    }
-
-                    User updatedUser = userBuilder.build();
-                    return saveUser(updatedUser);
-                })
-                .doOnSuccess(user -> log.info("User profile updated: id={}", user.id()));
-    }
-
     public Flux<UserDto> findAllUsers(Pageable pageable) {
         return Mono.fromCallable(() -> userRepository.findAll(pageable))
                 .subscribeOn(Schedulers.boundedElastic())

@@ -44,13 +44,4 @@ public class UserController {
     public Mono<UserDto> getUserById(@PathVariable Long id) {
         return userService.findById(id);
     }
-
-    @PutMapping("/{id}/profile")
-    @Operation(summary = "Update user profile")
-    public Mono<UserDto> updateProfile(
-            @PathVariable Long id,
-            @Valid @RequestBody RegisterRequest request) {
-
-        return userService.updateProfile(id, request);
-    }
 }
